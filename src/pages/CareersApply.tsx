@@ -183,12 +183,11 @@ export default function CareersApply() {
       
       await applicationsAPI.create({
         job_id: jobId!,
-        job_title: job!.title,
+        job_title: `${job!.title} - ${formData.desired_position}`,
         full_name: formData.full_name,
         email: formData.email,
         phone: formData.phone,
         nationality: formData.nationality,
-        position: formData.desired_position,
         date_of_birth: formData.date_of_birth,
         certificates: formData.certificates || null,
         experience_years: experienceYears[0],
