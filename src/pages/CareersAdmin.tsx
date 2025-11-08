@@ -898,7 +898,7 @@ export default function CareersAdmin() {
     setEmailRecipientFormData({
       email: recipient.email,
       name: recipient.name,
-      nationality: recipient.nationality || '',
+      nationality: recipient.nationality ?? '',
       is_active: recipient.is_active
     });
     setShowEmailRecipientForm(true);
