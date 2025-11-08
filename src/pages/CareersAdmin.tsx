@@ -91,7 +91,7 @@ export default function CareersAdmin() {
   const [emailRecipientFormData, setEmailRecipientFormData] = useState({
     email: '',
     name: '',
-    nationality: '',
+    nationality: 'all',
     is_active: true
   });
   const [agencyFormData, setAgencyFormData] = useState({
@@ -873,7 +873,7 @@ export default function CareersAdmin() {
     setEmailRecipientFormData({
       email: '',
       name: '',
-      nationality: '',
+      nationality: 'all',
       is_active: true
     });
     setSelectedEmailRecipient(null);
@@ -898,7 +898,7 @@ export default function CareersAdmin() {
     setEmailRecipientFormData({
       email: recipient.email,
       name: recipient.name,
-      nationality: recipient.nationality ?? '',
+      nationality: recipient.nationality || 'all',
       is_active: recipient.is_active
     });
     setShowEmailRecipientForm(true);
@@ -918,7 +918,7 @@ export default function CareersAdmin() {
       const recipientData = {
         email: emailRecipientFormData.email,
         name: emailRecipientFormData.name,
-        nationality: emailRecipientFormData.nationality || null,
+        nationality: emailRecipientFormData.nationality === 'all' ? null : emailRecipientFormData.nationality,
         is_active: emailRecipientFormData.is_active
       };
 
@@ -2512,7 +2512,7 @@ export default function CareersAdmin() {
                   <Label className="text-sm text-gray-500">Date of Birth</Label>
                   <p className="flex items-center gap-2">
                     <Calendar className="w-4 h-4" />
-                    {new Date(selectedApplication.date_of_birth).toLocaleDateString()}
+                    {selectedApplication.date_of_birth ? new Date(selectedApplication.date_of_birth).toLocaleDateString() : 'N/A'}
                   </p>
                 </div>
                 <div>
@@ -2520,19 +2520,8 @@ export default function CareersAdmin() {
                   <p>{selectedApplication.nationality}</p>
                 </div>
                 <div>
-                  <Label className="text-sm text-gray-500">Position</Label>
-                  <p>{selectedApplication.position}</p>
-                </div>
-                <div>
-                  <Label className="text-sm text-gray-500">Vessel Type</Label>
-                  <p className="flex items-center gap-2">
-                    <Ship className="w-4 h-4" />
-                    {selectedApplication.vessel_type}
-                  </p>
-                </div>
-                <div>
                   <Label className="text-sm text-gray-500">Experience</Label>
-                  <p>{selectedApplication.years_of_experience} years</p>
+                  <p>{selectedApplication.experience_years} years</p>
                 </div>
                 <div>
                   <Label className="text-sm text-gray-500">Expected Salary</Label>
@@ -2545,7 +2534,7 @@ export default function CareersAdmin() {
                   <Label className="text-sm text-gray-500">Agency</Label>
                   <p className="flex items-center gap-2">
                     <Building2 className="w-4 h-4" />
-                    {selectedApplication.agency || 'N/A'}
+                    {selectedApplication.agency_id ? agencies.find(a => a.id === selectedApplication.agency_id)?.name || 'N/A' : 'Direct Application'}
                   </p>
                 </div>
                 <div>
@@ -2553,6 +2542,24 @@ export default function CareersAdmin() {
                   <p>{new Date(selectedApplication.submitted_date).toLocaleString()}</p>
                 </div>
               </div>
+
+              {selectedApplication.certificates && (
+                <div>
+                  <Label className="text-sm text-gray-500 mb-2 block">Certificates</Label>
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <p className="whitespace-pre-wrap">{selectedApplication.certificates}</p>
+                  </div>
+                </div>
+              )}
+
+              {selectedApplication.previous_vessels && (
+                <div>
+                  <Label className="text-sm text-gray-500 mb-2 block">Previous Vessels</Label>
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <p className="whitespace-pre-wrap">{selectedApplication.previous_vessels}</p>
+                  </div>
+                </div>
+              )}
 
               {selectedApplication.cover_letter && (
                 <div>
@@ -3247,7 +3254,7 @@ export default function CareersAdmin() {
                       <SelectValue placeholder="All nationalities" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">All nationalities</SelectItem>
+                      <SelectItem value="all">All nationalities</SelectItem>
                       {nationalityOptions.map((nat) => (
                         <SelectItem key={nat.id} value={nat.name}>
                           {nat.name}
