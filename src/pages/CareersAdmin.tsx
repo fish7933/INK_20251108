@@ -12,7 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Lock, Eye, Mail, Phone, Calendar, FileText, Ship, Loader2, Plus, Edit, Trash2, UserPlus, Check, X, Key, CheckCircle2, XCircle, Info, Download, DollarSign, Paperclip, Building2, Settings } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Lock, Eye, Mail, Phone, Calendar, FileText, Ship, Loader2, Plus, Edit, Trash2, UserPlus, Check, X, Key, CheckCircle2, XCircle, Info, Download, DollarSign, Paperclip, Building2, Settings, ChevronDown, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { 
   applicationsAPI, 
@@ -76,6 +77,7 @@ export default function CareersAdmin() {
   const [newLocationName, setNewLocationName] = useState('');
   const [newSalaryRangeName, setNewSalaryRangeName] = useState('');
   const [newNationalityName, setNewNationalityName] = useState('');
+  const [openJobGroups, setOpenJobGroups] = useState<string[]>([]);
   const [adminFormData, setAdminFormData] = useState({
     username: '',
     password: '',
@@ -482,6 +484,12 @@ export default function CareersAdmin() {
     } else {
       setSelectedJobIds(jobPostings.map(job => job.id));
     }
+  };
+
+  const toggleJobGroup = (jobTitle: string) => {
+    setOpenJobGroups(prev =>
+      prev.includes(jobTitle) ? prev.filter(t => t !== jobTitle) : [...prev, jobTitle]
+    );
   };
 
   const handleCreateAgency = () => {
@@ -1481,6 +1489,99 @@ export default function CareersAdmin() {
     );
   };
 
+  const renderApplicationsByJob = () => {
+    // Group applications by job title
+    const applicationsByJob = applications.reduce((acc, app) => {
+      const jobTitle = app.job_title;
+      if (!acc[jobTitle]) {
+        acc[jobTitle] = [];
+      }
+      acc[jobTitle].push(app);
+      return acc;
+    }, {} as Record<string, Application[]>);
+
+    // Get job titles sorted by application count (descending)
+    const jobTitles = Object.keys(applicationsByJob).sort((a, b) => 
+      applicationsByJob[b].length - applicationsByJob[a].length
+    );
+
+    if (jobTitles.length === 0) {
+      return (
+        <p className="text-center py-8 text-gray-500">
+          No applications yet
+        </p>
+      );
+    }
+
+    return (
+      <div className="space-y-4">
+        {jobTitles.map((jobTitle) => {
+          const jobApps = applicationsByJob[jobTitle];
+          const isOpen = openJobGroups.includes(jobTitle);
+          const statusCounts = {
+            pending: jobApps.filter(a => a.status === 'pending').length,
+            reviewed: jobApps.filter(a => a.status === 'reviewed').length,
+            shortlisted: jobApps.filter(a => a.status === 'shortlisted').length,
+            rejected: jobApps.filter(a => a.status === 'rejected').length
+          };
+
+          return (
+            <Card key={jobTitle}>
+              <Collapsible open={isOpen} onOpenChange={() => toggleJobGroup(jobTitle)}>
+                <CollapsibleTrigger asChild>
+                  <CardHeader className="cursor-pointer hover:bg-gray-50 transition-colors">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        {isOpen ? (
+                          <ChevronDown className="w-5 h-5 text-gray-500" />
+                        ) : (
+                          <ChevronRight className="w-5 h-5 text-gray-500" />
+                        )}
+                        <div>
+                          <CardTitle className="text-lg">{jobTitle}</CardTitle>
+                          <CardDescription className="mt-1">
+                            {jobApps.length} application{jobApps.length !== 1 ? 's' : ''}
+                          </CardDescription>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        {statusCounts.pending > 0 && (
+                          <Badge className="bg-yellow-100 text-yellow-800">
+                            Pending: {statusCounts.pending}
+                          </Badge>
+                        )}
+                        {statusCounts.reviewed > 0 && (
+                          <Badge className="bg-blue-100 text-blue-800">
+                            Reviewed: {statusCounts.reviewed}
+                          </Badge>
+                        )}
+                        {statusCounts.shortlisted > 0 && (
+                          <Badge className="bg-green-100 text-green-800">
+                            Shortlisted: {statusCounts.shortlisted}
+                          </Badge>
+                        )}
+                        {statusCounts.rejected > 0 && (
+                          <Badge className="bg-red-100 text-red-800">
+                            Rejected: {statusCounts.rejected}
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  </CardHeader>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <CardContent>
+                    {renderApplicationTable(jobApps)}
+                  </CardContent>
+                </CollapsibleContent>
+              </Collapsible>
+            </Card>
+          );
+        })}
+      </div>
+    );
+  };
+
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen flex flex-col">
@@ -1733,7 +1834,8 @@ export default function CareersAdmin() {
               <TabsContent value="applications" className="space-y-6">
                 <Tabs defaultValue="all">
                   <TabsList>
-                    <TabsTrigger value="all">All</TabsTrigger>
+                    <TabsTrigger value="all">All Applications</TabsTrigger>
+                    <TabsTrigger value="by-job">By Job Posting</TabsTrigger>
                     <TabsTrigger value="pending">Pending</TabsTrigger>
                     <TabsTrigger value="shortlisted">Shortlisted</TabsTrigger>
                   </TabsList>
@@ -1745,6 +1847,20 @@ export default function CareersAdmin() {
                       </CardHeader>
                       <CardContent>
                         {renderApplicationTable(applications)}
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+
+                  <TabsContent value="by-job">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Applications by Job Posting</CardTitle>
+                        <CardDescription>
+                          Click on a job posting to expand and view its applications
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        {renderApplicationsByJob()}
                       </CardContent>
                     </Card>
                   </TabsContent>
