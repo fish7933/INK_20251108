@@ -988,24 +988,14 @@ export default function CareersAdmin() {
     }
   };
 
-
-  const handleJobFormChange = (field: string, value: string | string[]) => {
+  const handleJobFormChange = (field: string, value: string) => {
     setJobFormData(prev => ({ ...prev, [field]: value }));
-  };
-
-  const togglePositionSelection = (positionName: string) => {
-    setJobFormData(prev => ({
-      ...prev,
-      positions: prev.positions.includes(positionName)
-        ? prev.positions.filter(p => p !== positionName)
-        : [...prev.positions, positionName]
-    }));
   };
 
   const resetJobForm = () => {
     setJobFormData({
       title: '',
-      positions: [],
+      position: '',
       vessel_type: '',
       location: '',
       salary_range: '',
@@ -1036,7 +1026,7 @@ export default function CareersAdmin() {
     setSelectedJob(job);
     setJobFormData({
       title: job.title,
-      positions: job.positions || [],
+      position: job.position,
       vessel_type: job.vessel_type,
       location: job.location,
       salary_range: job.salary_range,
@@ -1050,8 +1040,8 @@ export default function CareersAdmin() {
   const handleSaveJob = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!jobFormData.title || jobFormData.positions.length === 0 || !jobFormData.vessel_type) {
-      toast.error('Please fill in all required fields (title, at least one position, and vessel type)');
+    if (!jobFormData.title || !jobFormData.position || !jobFormData.vessel_type) {
+      toast.error('Please fill in all required fields');
       return;
     }
 
@@ -1060,7 +1050,7 @@ export default function CareersAdmin() {
       
       const jobData = {
         title: jobFormData.title,
-        positions: jobFormData.positions,
+        position: jobFormData.position,
         vessel_type: jobFormData.vessel_type,
         location: jobFormData.location,
         salary_range: jobFormData.salary_range,
@@ -1591,6 +1581,7 @@ export default function CareersAdmin() {
       </div>
     );
   };
+
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen flex flex-col">
@@ -1948,7 +1939,7 @@ export default function CareersAdmin() {
                               </TableHead>
                             )}
                             <TableHead>Title</TableHead>
-                            <TableHead>Positions</TableHead>
+                            <TableHead>Position</TableHead>
                             <TableHead>Vessel Type</TableHead>
                             <TableHead>Location</TableHead>
                             <TableHead>Status</TableHead>
@@ -2699,7 +2690,6 @@ export default function CareersAdmin() {
         </div>
       )}
 
-
       {/* Job Form Modal */}
       {showJobForm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 overflow-y-auto">
@@ -2729,33 +2719,25 @@ export default function CareersAdmin() {
                     required
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label>Positions * (Select at least one)</Label>
-                  <div className="grid grid-cols-2 gap-2 p-4 border rounded-lg max-h-48 overflow-y-auto">
-                    {positionOptions.map((pos) => (
-                      <div key={pos.id} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`position-${pos.id}`}
-                          checked={jobFormData.positions.includes(pos.name)}
-                          onCheckedChange={() => togglePositionSelection(pos.name)}
-                        />
-                        <Label htmlFor={`position-${pos.id}`} className="cursor-pointer">
-                          {pos.name}
-                        </Label>
-                      </div>
-                    ))}
-                  </div>
-                  {jobFormData.positions.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      {jobFormData.positions.map((pos, idx) => (
-                        <Badge key={idx} variant="secondary">
-                          {pos}
-                        </Badge>
-                      ))}
-                    </div>
-                  )}
-                </div>
                 <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="job_position">Position *</Label>
+                    <Select
+                      value={jobFormData.position}
+                      onValueChange={(value) => handleJobFormChange('position', value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select position" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {positionOptions.map((pos) => (
+                          <SelectItem key={pos.id} value={pos.name}>
+                            {pos.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                   <div className="space-y-2">
                     <Label htmlFor="job_vessel_type">Vessel Type *</Label>
                     <Select
