@@ -137,6 +137,7 @@ export interface Application {
   date_of_birth: string | null;
   nationality: string | null;
   job_title: string;
+  position: string;
   experience_years: number | null;
   expected_salary: number | null;
   salary_currency: string | null;
@@ -157,7 +158,7 @@ export interface Application {
 export interface JobPosting {
   id: string;
   title: string;
-  position: string;
+  positions: string[];
   vessel_type: string;
   location: string;
   salary_range: string;
