@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Lock, Eye, Mail, Phone, Calendar, FileText, Ship, Loader2, Plus, Edit, Trash2, UserPlus, Check, X, Key, CheckCircle2, XCircle, Info, Download, DollarSign, Paperclip, Building2 } from 'lucide-react';
+import { Lock, Eye, Mail, Phone, Calendar, FileText, Ship, Loader2, Plus, Edit, Trash2, UserPlus, Check, X, Key, CheckCircle2, XCircle, Info, Download, DollarSign, Paperclip, Building2, Settings } from 'lucide-react';
 import { toast } from 'sonner';
 import { 
   applicationsAPI, 
@@ -62,6 +62,7 @@ export default function CareersAdmin() {
   const [showJobForm, setShowJobForm] = useState(false);
   const [showAdminForm, setShowAdminForm] = useState(false);
   const [showPasswordForm, setShowPasswordForm] = useState(false);
+  const [showPermissionsForm, setShowPermissionsForm] = useState(false);
   const [showEmailRecipientForm, setShowEmailRecipientForm] = useState(false);
   const [showAgencyForm, setShowAgencyForm] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -1237,6 +1238,16 @@ export default function CareersAdmin() {
     }
   };
 
+  const handleEditPermissions = (admin: Omit<AdminUser, 'password_hash'>) => {
+    if (!currentUser?.permissions.admins.edit) {
+      toast.error('You do not have permission to edit permissions');
+      return;
+    }
+
+    setSelectedAdmin(admin);
+    setShowPermissionsForm(true);
+  };
+
   const handleUpdatePermissions = async (adminId: string, category: string, action: string, value: boolean) => {
     if (!currentUser?.permissions.admins.edit) {
       toast.error('You do not have permission to update permissions');
@@ -1260,6 +1271,12 @@ export default function CareersAdmin() {
       setAdminUsers(adminUsers.map(a =>
         a.id === adminId ? { ...a, permissions: updatedPermissions } : a
       ));
+      
+      // Update selectedAdmin if it's the same admin
+      if (selectedAdmin?.id === adminId) {
+        setSelectedAdmin({ ...selectedAdmin, permissions: updatedPermissions });
+      }
+      
       toast.success('Permissions updated');
     } catch (error) {
       console.error('Error updating permissions:', error);
@@ -1887,7 +1904,26 @@ export default function CareersAdmin() {
                           {adminUsers.map((admin) => (
                             <TableRow key={admin.id}>
                               <TableCell className="font-medium">{admin.username}</TableCell>
-                              <TableCell>{getRoleBadge(admin.role)}</TableCell>
+                              <TableCell>
+                                {currentUser?.permissions.admins.edit && admin.is_approved ? (
+                                  <Select
+                                    value={admin.role}
+                                    onValueChange={(value) => handleUpdateRole(admin.id, value as AdminUser['role'])}
+                                    disabled={updating}
+                                  >
+                                    <SelectTrigger className="w-[140px]">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="viewer">Viewer</SelectItem>
+                                      <SelectItem value="admin">Admin</SelectItem>
+                                      <SelectItem value="super_admin">Super Admin</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                ) : (
+                                  getRoleBadge(admin.role)
+                                )}
+                              </TableCell>
                               <TableCell>
                                 {admin.is_approved ? (
                                   <Badge className="bg-green-100 text-green-800">Approved</Badge>
@@ -1922,6 +1958,15 @@ export default function CareersAdmin() {
                                   )}
                                   {admin.is_approved && (
                                     <>
+                                      {currentUser?.permissions.admins.edit && (
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={() => handleEditPermissions(admin)}
+                                        >
+                                          <Settings className="w-4 h-4" />
+                                        </Button>
+                                      )}
                                       <Button
                                         size="sm"
                                         variant="outline"
@@ -2693,6 +2738,158 @@ export default function CareersAdmin() {
                   </Button>
                 </div>
               </form>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Permissions Edit Modal */}
+      {showPermissionsForm && selectedAdmin && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <Card className="max-w-2xl w-full my-8">
+            <CardHeader>
+              <div className="flex justify-between items-start">
+                <CardTitle className="text-2xl">Edit Permissions</CardTitle>
+                <Button
+                  variant="ghost"
+                  onClick={() => setShowPermissionsForm(false)}
+                >
+                  ✕
+                </Button>
+              </div>
+              <CardDescription>
+                Managing permissions for: {selectedAdmin.username}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                {/* Applications Permissions */}
+                <div className="border rounded-lg p-4">
+                  <h3 className="font-semibold mb-3">Applications</h3>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="app_view">View Applications</Label>
+                      <Switch
+                        id="app_view"
+                        checked={selectedAdmin.permissions.applications.view}
+                        onCheckedChange={(checked) => handleUpdatePermissions(selectedAdmin.id, 'applications', 'view', checked)}
+                        disabled={updating}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="app_edit">Edit Applications</Label>
+                      <Switch
+                        id="app_edit"
+                        checked={selectedAdmin.permissions.applications.edit}
+                        onCheckedChange={(checked) => handleUpdatePermissions(selectedAdmin.id, 'applications', 'edit', checked)}
+                        disabled={updating}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="app_delete">Delete Applications</Label>
+                      <Switch
+                        id="app_delete"
+                        checked={selectedAdmin.permissions.applications.delete}
+                        onCheckedChange={(checked) => handleUpdatePermissions(selectedAdmin.id, 'applications', 'delete', checked)}
+                        disabled={updating}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Jobs Permissions */}
+                <div className="border rounded-lg p-4">
+                  <h3 className="font-semibold mb-3">Job Postings</h3>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="jobs_view">View Jobs</Label>
+                      <Switch
+                        id="jobs_view"
+                        checked={selectedAdmin.permissions.jobs.view}
+                        onCheckedChange={(checked) => handleUpdatePermissions(selectedAdmin.id, 'jobs', 'view', checked)}
+                        disabled={updating}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="jobs_edit">Edit Jobs</Label>
+                      <Switch
+                        id="jobs_edit"
+                        checked={selectedAdmin.permissions.jobs.edit}
+                        onCheckedChange={(checked) => handleUpdatePermissions(selectedAdmin.id, 'jobs', 'edit', checked)}
+                        disabled={updating}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="jobs_delete">Delete Jobs</Label>
+                      <Switch
+                        id="jobs_delete"
+                        checked={selectedAdmin.permissions.jobs.delete}
+                        onCheckedChange={(checked) => handleUpdatePermissions(selectedAdmin.id, 'jobs', 'delete', checked)}
+                        disabled={updating}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Admins Permissions */}
+                <div className="border rounded-lg p-4">
+                  <h3 className="font-semibold mb-3">Admin Users</h3>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="admins_view">View Admins</Label>
+                      <Switch
+                        id="admins_view"
+                        checked={selectedAdmin.permissions.admins.view}
+                        onCheckedChange={(checked) => handleUpdatePermissions(selectedAdmin.id, 'admins', 'view', checked)}
+                        disabled={updating}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="admins_edit">Edit Admins</Label>
+                      <Switch
+                        id="admins_edit"
+                        checked={selectedAdmin.permissions.admins.edit}
+                        onCheckedChange={(checked) => handleUpdatePermissions(selectedAdmin.id, 'admins', 'edit', checked)}
+                        disabled={updating}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Settings Permissions */}
+                <div className="border rounded-lg p-4">
+                  <h3 className="font-semibold mb-3">Settings</h3>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="settings_view">View Settings</Label>
+                      <Switch
+                        id="settings_view"
+                        checked={selectedAdmin.permissions.settings.view}
+                        onCheckedChange={(checked) => handleUpdatePermissions(selectedAdmin.id, 'settings', 'view', checked)}
+                        disabled={updating}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="settings_edit">Edit Settings</Label>
+                      <Switch
+                        id="settings_edit"
+                        checked={selectedAdmin.permissions.settings.edit}
+                        onCheckedChange={(checked) => handleUpdatePermissions(selectedAdmin.id, 'settings', 'edit', checked)}
+                        disabled={updating}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex justify-end">
+                  <Button
+                    onClick={() => setShowPermissionsForm(false)}
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    Done
+                  </Button>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </div>

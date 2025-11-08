@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Slider } from '@/components/ui/slider';
 import { ArrowLeft, Upload, CheckCircle, Loader2, Eye, DollarSign, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import { jobPostingsAPI, applicationsAPI, nationalityOptionsAPI, agenciesAPI, JobPosting, NationalityOption, Agency } from '@/lib/supabase';
+import { jobPostingsAPI, applicationsAPI, nationalityOptionsAPI, agenciesAPI, positionOptionsAPI, JobPosting, NationalityOption, Agency, PositionOption } from '@/lib/supabase';
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const ALLOWED_FILE_TYPES = ['.pdf', '.doc', '.docx'];
@@ -25,6 +25,7 @@ export default function CareersApply() {
   const navigate = useNavigate();
   const [job, setJob] = useState<JobPosting | null>(null);
   const [nationalityOptions, setNationalityOptions] = useState<NationalityOption[]>([]);
+  const [positionOptions, setPositionOptions] = useState<PositionOption[]>([]);
   const [agencies, setAgencies] = useState<Agency[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -37,6 +38,7 @@ export default function CareersApply() {
     email: '',
     phone: '',
     nationality: '',
+    desired_position: '',
     date_of_birth: '',
     certificates: '',
     previous_vessels: '',
@@ -53,9 +55,10 @@ export default function CareersApply() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [jobData, nationalitiesData, agenciesData] = await Promise.all([
+      const [jobData, nationalitiesData, positionsData, agenciesData] = await Promise.all([
         jobId ? jobPostingsAPI.getById(jobId) : null,
         nationalityOptionsAPI.getAll(),
+        positionOptionsAPI.getAll(),
         agenciesAPI.getActive()
       ]);
       
@@ -63,6 +66,7 @@ export default function CareersApply() {
         setJob(jobData);
       }
       setNationalityOptions(nationalitiesData);
+      setPositionOptions(positionsData);
       setAgencies(agenciesData);
     } catch (error) {
       console.error('Error loading data:', error);
@@ -84,6 +88,13 @@ export default function CareersApply() {
     setFormData({
       ...formData,
       nationality: value
+    });
+  };
+
+  const handlePositionChange = (value: string) => {
+    setFormData({
+      ...formData,
+      desired_position: value
     });
   };
 
@@ -152,7 +163,7 @@ export default function CareersApply() {
     e.preventDefault();
 
     // Validation
-    if (!formData.full_name || !formData.email || !formData.phone || !formData.nationality || !formData.date_of_birth || !formData.expected_salary) {
+    if (!formData.full_name || !formData.email || !formData.phone || !formData.nationality || !formData.desired_position || !formData.date_of_birth || !formData.expected_salary) {
       toast.error('Please fill in all required fields');
       return;
     }
@@ -177,6 +188,7 @@ export default function CareersApply() {
         email: formData.email,
         phone: formData.phone,
         nationality: formData.nationality,
+        position: formData.desired_position,
         date_of_birth: formData.date_of_birth,
         certificates: formData.certificates || null,
         experience_years: experienceYears[0],
@@ -324,6 +336,10 @@ export default function CareersApply() {
                     <p className="text-lg font-medium">{formData.nationality}</p>
                   </div>
                   <div>
+                    <Label className="text-sm text-gray-500">Desired Position</Label>
+                    <p className="text-lg font-medium">{formData.desired_position}</p>
+                  </div>
+                  <div>
                     <Label className="text-sm text-gray-500">Date of Birth</Label>
                     <p className="text-lg font-medium">{formData.date_of_birth}</p>
                   </div>
@@ -337,7 +353,7 @@ export default function CareersApply() {
                   </div>
                   {formData.agency_id && (
                     <div>
-                      <Label className="text-sm text-gray-500">대리점</Label>
+                      <Label className="text-sm text-gray-500">Agency</Label>
                       <p className="text-lg font-medium">{getAgencyName(formData.agency_id)}</p>
                     </div>
                   )}
@@ -462,6 +478,25 @@ export default function CareersApply() {
                       </Select>
                     </div>
                     <div className="space-y-2">
+                      <Label htmlFor="desired_position">Desired Position *</Label>
+                      <Select
+                        value={formData.desired_position}
+                        onValueChange={handlePositionChange}
+                        required
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select desired position" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {positionOptions.map((position) => (
+                            <SelectItem key={position.id} value={position.name}>
+                              {position.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
                       <Label htmlFor="date_of_birth">Date of Birth *</Label>
                       <Input
                         id="date_of_birth"
@@ -513,16 +548,16 @@ export default function CareersApply() {
 
                   {agencies.length > 0 && (
                     <div className="space-y-2">
-                      <Label htmlFor="agency_id">대리점 (선택사항)</Label>
+                      <Label htmlFor="agency_id">Agency (Optional)</Label>
                       <Select
                         value={formData.agency_id}
                         onValueChange={handleAgencyChange}
                       >
                         <SelectTrigger>
-                          <SelectValue placeholder="대리점을 선택하세요" />
+                          <SelectValue placeholder="Select an agency" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="none">직접 지원</SelectItem>
+                          <SelectItem value="none">Direct Application</SelectItem>
                           {agencies.map((agency) => (
                             <SelectItem key={agency.id} value={agency.id}>
                               {agency.name}
@@ -530,7 +565,7 @@ export default function CareersApply() {
                           ))}
                         </SelectContent>
                       </Select>
-                      <p className="text-xs text-gray-500">대리점을 통해 지원하는 경우 선택하세요</p>
+                      <p className="text-xs text-gray-500">Select an agency if you are applying through one</p>
                     </div>
                   )}
 
