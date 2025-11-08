@@ -104,7 +104,7 @@ export default function CareersAdmin() {
   });
   const [jobFormData, setJobFormData] = useState({
     title: '',
-    position: '',
+    positions: [],
     vessel_type: '',
     location: '',
     salary_range: '',
@@ -1967,7 +1967,7 @@ export default function CareersAdmin() {
                                 </TableCell>
                               )}
                               <TableCell className="font-medium">{job.title}</TableCell>
-                              <TableCell>{job.position}</TableCell>
+                              <TableCell>{job.positions?.join(", ") || "N/A"}</TableCell>
                               <TableCell>{job.vessel_type}</TableCell>
                               <TableCell>{job.location}</TableCell>
                               <TableCell>{getJobStatusBadge(job.status)}</TableCell>
