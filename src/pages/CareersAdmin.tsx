@@ -64,6 +64,7 @@ export default function CareersAdmin() {
   const [showPasswordForm, setShowPasswordForm] = useState(false);
   const [showPermissionsForm, setShowPermissionsForm] = useState(false);
   const [showEmailRecipientForm, setShowEmailRecipientForm] = useState(false);
+  const [showEmailRecipientDetail, setShowEmailRecipientDetail] = useState(false);
   const [showAgencyForm, setShowAgencyForm] = useState(false);
   const [loading, setLoading] = useState(false);
   const [updating, setUpdating] = useState(false);
@@ -869,6 +870,11 @@ export default function CareersAdmin() {
     });
     setSelectedEmailRecipient(null);
     setShowEmailRecipientForm(true);
+  };
+
+  const handleViewEmailRecipient = (recipient: EmailRecipient) => {
+    setSelectedEmailRecipient(recipient);
+    setShowEmailRecipientDetail(true);
   };
 
   const handleEditEmailRecipient = (recipient: EmailRecipient) => {
@@ -2127,6 +2133,13 @@ export default function CareersAdmin() {
                                   </TableCell>
                                   <TableCell>
                                     <div className="flex gap-2">
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => handleViewEmailRecipient(recipient)}
+                                      >
+                                        <Eye className="w-4 h-4" />
+                                      </Button>
                                       {currentUser?.permissions.settings.edit && (
                                         <>
                                           <Button
@@ -2493,6 +2506,59 @@ export default function CareersAdmin() {
                   </div>
                 </div>
               )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Email Recipient Detail Modal */}
+      {showEmailRecipientDetail && selectedEmailRecipient && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <Card className="max-w-md w-full">
+            <CardHeader>
+              <div className="flex justify-between items-start">
+                <CardTitle className="text-2xl">Email Recipient Details</CardTitle>
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setShowEmailRecipientDetail(false);
+                    setSelectedEmailRecipient(null);
+                  }}
+                >
+                  ✕
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label className="text-sm text-gray-500">Name</Label>
+                <p className="font-medium">{selectedEmailRecipient.name}</p>
+              </div>
+              <div>
+                <Label className="text-sm text-gray-500">Email</Label>
+                <p className="flex items-center gap-2">
+                  <Mail className="w-4 h-4" />
+                  {selectedEmailRecipient.email}
+                </p>
+              </div>
+              <div>
+                <Label className="text-sm text-gray-500">Nationality Filter</Label>
+                <p>{selectedEmailRecipient.nationality || 'All nationalities'}</p>
+              </div>
+              <div>
+                <Label className="text-sm text-gray-500">Status</Label>
+                <p>
+                  {selectedEmailRecipient.is_active ? (
+                    <Badge className="bg-green-100 text-green-800">Active</Badge>
+                  ) : (
+                    <Badge className="bg-gray-100 text-gray-800">Inactive</Badge>
+                  )}
+                </p>
+              </div>
+              <div>
+                <Label className="text-sm text-gray-500">Created</Label>
+                <p>{new Date(selectedEmailRecipient.created_at).toLocaleString()}</p>
+              </div>
             </CardContent>
           </Card>
         </div>

@@ -506,6 +506,11 @@ export const adminUsersAPI = {
   },
 
   async create(username: string, password: string, role: AdminUser['role']): Promise<Omit<AdminUser, 'password_hash'>> {
+    // Prevent creating new super_admin accounts
+    if (role === 'super_admin') {
+      throw new Error('Cannot create new Super Admin accounts. Super Admin role can only be transferred to existing admin users.');
+    }
+
     const encoder = new TextEncoder();
     const passwordData = encoder.encode(password);
     const hashBuffer = await crypto.subtle.digest('SHA-256', passwordData);
@@ -519,12 +524,7 @@ export const adminUsersAPI = {
       settings: { view: false, edit: false, delete: false }
     };
 
-    if (role === 'super_admin') {
-      defaultPermissions.applications = { view: true, edit: true, delete: true };
-      defaultPermissions.jobs = { view: true, edit: true, delete: true };
-      defaultPermissions.admins = { view: true, edit: true, delete: true };
-      defaultPermissions.settings = { view: true, edit: true, delete: true };
-    } else if (role === 'admin') {
+    if (role === 'admin') {
       defaultPermissions.applications = { view: true, edit: true, delete: true };
       defaultPermissions.jobs = { view: true, edit: true, delete: true };
       defaultPermissions.settings = { view: true, edit: false, delete: false };
@@ -599,8 +599,6 @@ export const adminUsersAPI = {
       if (!superAdmins || superAdmins.length <= 1) {
         throw new Error('Cannot delete the last super admin. At least one super admin must exist.');
       }
-
-      throw new Error('Cannot delete super admin accounts. Please demote to admin or viewer first.');
     }
 
     const { error } = await supabase
@@ -658,7 +656,24 @@ export const adminUsersAPI = {
       throw new Error('User not found');
     }
 
-    // Prevent demoting super_admin
+    // If promoting to super_admin, ensure there's at least one existing super_admin
+    if (role === 'super_admin') {
+      const { data: superAdmins, error: countError } = await supabase
+        .from('app_7c39e793e3_admin_users')
+        .select('id')
+        .eq('role', 'super_admin');
+
+      if (countError) throw countError;
+
+      if (!superAdmins || superAdmins.length === 0) {
+        throw new Error('Cannot transfer Super Admin role: No existing Super Admin found.');
+      }
+
+      // This is a transfer operation - the current super admin should demote themselves
+      // after promoting this user
+    }
+
+    // Prevent demoting super_admin unless transferring
     if (user.role === 'super_admin' && role !== 'super_admin') {
       // Count total super admins
       const { data: superAdmins, error: countError } = await supabase
@@ -669,15 +684,35 @@ export const adminUsersAPI = {
       if (countError) throw countError;
 
       if (!superAdmins || superAdmins.length <= 1) {
-        throw new Error('Cannot demote the last super admin. At least one super admin must exist.');
+        throw new Error('Cannot demote the last super admin. Please transfer the role to another admin first.');
       }
+    }
 
-      throw new Error('Cannot demote super admin accounts. This is a protected role.');
+    // Update role and set appropriate permissions
+    const updatedPermissions = {
+      applications: { view: false, edit: false, delete: false },
+      jobs: { view: false, edit: false, delete: false },
+      admins: { view: false, edit: false, delete: false },
+      settings: { view: false, edit: false, delete: false }
+    };
+
+    if (role === 'super_admin') {
+      updatedPermissions.applications = { view: true, edit: true, delete: true };
+      updatedPermissions.jobs = { view: true, edit: true, delete: true };
+      updatedPermissions.admins = { view: true, edit: true, delete: true };
+      updatedPermissions.settings = { view: true, edit: true, delete: true };
+    } else if (role === 'admin') {
+      updatedPermissions.applications = { view: true, edit: true, delete: true };
+      updatedPermissions.jobs = { view: true, edit: true, delete: true };
+      updatedPermissions.settings = { view: true, edit: false, delete: false };
+    } else if (role === 'viewer') {
+      updatedPermissions.applications = { view: true, edit: false, delete: false };
+      updatedPermissions.jobs = { view: true, edit: false, delete: false };
     }
 
     const { error } = await supabase
       .from('app_7c39e793e3_admin_users')
-      .update({ role })
+      .update({ role, permissions: updatedPermissions })
       .eq('id', id);
 
     if (error) throw error;
