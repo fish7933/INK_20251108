@@ -104,7 +104,7 @@ export default function CareersAdmin() {
   });
   const [jobFormData, setJobFormData] = useState({
     title: '',
-    positions: [] as string[],
+    position: '',
     vessel_type: '',
     location: '',
     salary_range: '',
@@ -492,15 +492,6 @@ export default function CareersAdmin() {
     );
   };
 
-
-  const handleTogglePosition = (positionName: string) => {
-    setJobFormData(prev => ({
-      ...prev,
-      positions: prev.positions.includes(positionName)
-        ? prev.positions.filter(p => p !== positionName)
-        : [...prev.positions, positionName]
-    }));
-  };
   const handleCreateAgency = () => {
     if (!currentUser?.permissions.settings.edit) {
       toast.error('You do not have permission to edit settings');
@@ -1004,7 +995,7 @@ export default function CareersAdmin() {
   const resetJobForm = () => {
     setJobFormData({
       title: '',
-      positions: [],
+      position: '',
       vessel_type: '',
       location: '',
       salary_range: '',
@@ -1035,7 +1026,7 @@ export default function CareersAdmin() {
     setSelectedJob(job);
     setJobFormData({
       title: job.title,
-      positions: job.positions || [],
+      position: job.position,
       vessel_type: job.vessel_type,
       location: job.location,
       salary_range: job.salary_range,
@@ -1049,8 +1040,7 @@ export default function CareersAdmin() {
   const handleSaveJob = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!jobFormData.title || jobFormData.positions.length === 0 || !jobFormData.vessel_type) {
-      toast.error('Please fill in all required fields and select at least one position');
+    if (!jobFormData.title || !jobFormData.position || !jobFormData.vessel_type) {
       toast.error('Please fill in all required fields');
       return;
     }
@@ -1060,7 +1050,7 @@ export default function CareersAdmin() {
       
       const jobData = {
         title: jobFormData.title,
-        positions: jobFormData.positions,
+        position: jobFormData.position,
         vessel_type: jobFormData.vessel_type,
         location: jobFormData.location,
         salary_range: jobFormData.salary_range,
@@ -1968,19 +1958,7 @@ export default function CareersAdmin() {
                                 </TableCell>
                               )}
                               <TableCell className="font-medium">{job.title}</TableCell>
-                              <TableCell>
-                                <div className="flex flex-wrap gap-1">
-                                  {job.positions && job.positions.length > 0 ? (
-                                    job.positions.map((pos, idx) => (
-                                      <Badge key={idx} variant="outline" className="text-xs">
-                                        {pos}
-                                      </Badge>
-                                    ))
-                                  ) : (
-                                    <span className="text-gray-400">No positions</span>
-                                  )}
-                                </div>
-                              </TableCell>
+                              <TableCell>{job.position}</TableCell>
                               <TableCell>{job.vessel_type}</TableCell>
                               <TableCell>{job.location}</TableCell>
                               <TableCell>{getJobStatusBadge(job.status)}</TableCell>
@@ -2737,37 +2715,29 @@ export default function CareersAdmin() {
                     id="job_title"
                     value={jobFormData.title}
                     onChange={(e) => handleJobFormChange('title', e.target.value)}
-                    placeholder="Enter job title"
+                    placeholder="e.g., Chief Engineer"
                     required
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label>Positions * (Select at least one)</Label>
-                  <div className="grid grid-cols-2 gap-2 p-4 border rounded-lg max-h-48 overflow-y-auto">
-                    {positionOptions.map((pos) => (
-                      <div key={pos.id} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`pos-${pos.id}`}
-                          checked={jobFormData.positions.includes(pos.name)}
-                          onCheckedChange={() => handleTogglePosition(pos.name)}
-                        />
-                        <Label htmlFor={`pos-${pos.id}`} className="cursor-pointer">
-                          {pos.name}
-                        </Label>
-                      </div>
-                    ))}
-                  </div>
-                  {jobFormData.positions.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mt-2">
-                      {jobFormData.positions.map((pos, idx) => (
-                        <Badge key={idx} variant="secondary">
-                          {pos}
-                        </Badge>
-                      ))}
-                    </div>
-                  )}
-                </div>
                 <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="job_position">Position *</Label>
+                    <Select
+                      value={jobFormData.position}
+                      onValueChange={(value) => handleJobFormChange('position', value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select position" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {positionOptions.map((pos) => (
+                          <SelectItem key={pos.id} value={pos.name}>
+                            {pos.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                   <div className="space-y-2">
                     <Label htmlFor="job_vessel_type">Vessel Type *</Label>
                     <Select
@@ -2786,6 +2756,8 @@ export default function CareersAdmin() {
                       </SelectContent>
                     </Select>
                   </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="job_location">Location</Label>
                     <Select
@@ -2804,24 +2776,24 @@ export default function CareersAdmin() {
                       </SelectContent>
                     </Select>
                   </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="job_salary_range">Salary Range</Label>
-                  <Select
-                    value={jobFormData.salary_range}
-                    onValueChange={(value) => handleJobFormChange('salary_range', value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select salary range" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {salaryRangeOptions.map((sr) => (
-                        <SelectItem key={sr.id} value={sr.name}>
-                          {sr.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="space-y-2">
+                    <Label htmlFor="job_salary_range">Salary Range</Label>
+                    <Select
+                      value={jobFormData.salary_range}
+                      onValueChange={(value) => handleJobFormChange('salary_range', value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select salary range" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {salaryRangeOptions.map((sr) => (
+                          <SelectItem key={sr.id} value={sr.name}>
+                            {sr.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="job_requirements">Requirements (one per line)</Label>
@@ -2887,6 +2859,7 @@ export default function CareersAdmin() {
           </Card>
         </div>
       )}
+
       {/* Password Change Modal */}
       {showPasswordForm && selectedAdmin && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
