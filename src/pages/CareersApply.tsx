@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Slider } from '@/components/ui/slider';
 import { ArrowLeft, Upload, CheckCircle, Loader2, Eye, DollarSign, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import { jobPostingsAPI, applicationsAPI, nationalityOptionsAPI, agenciesAPI, positionOptionsAPI, JobPosting, NationalityOption, Agency, PositionOption } from '@/lib/supabase';
+import { jobPostingsAPI, applicationsAPI, nationalityOptionsAPI, agenciesAPI, JobPosting, NationalityOption, Agency } from '@/lib/supabase';
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const ALLOWED_FILE_TYPES = ['.pdf', '.doc', '.docx'];
@@ -25,7 +25,6 @@ export default function CareersApply() {
   const navigate = useNavigate();
   const [job, setJob] = useState<JobPosting | null>(null);
   const [nationalityOptions, setNationalityOptions] = useState<NationalityOption[]>([]);
-  const [positionOptions, setPositionOptions] = useState<PositionOption[]>([]);
   const [agencies, setAgencies] = useState<Agency[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -38,7 +37,7 @@ export default function CareersApply() {
     email: '',
     phone: '',
     nationality: '',
-    desired_position: '',
+    selected_position: '',
     date_of_birth: '',
     certificates: '',
     previous_vessels: '',
@@ -55,10 +54,9 @@ export default function CareersApply() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [jobData, nationalitiesData, positionsData, agenciesData] = await Promise.all([
+      const [jobData, nationalitiesData, agenciesData] = await Promise.all([
         jobId ? jobPostingsAPI.getById(jobId) : null,
         nationalityOptionsAPI.getAll(),
-        positionOptionsAPI.getAll(),
         agenciesAPI.getActive()
       ]);
       
@@ -66,7 +64,6 @@ export default function CareersApply() {
         setJob(jobData);
       }
       setNationalityOptions(nationalitiesData);
-      setPositionOptions(positionsData);
       setAgencies(agenciesData);
     } catch (error) {
       console.error('Error loading data:', error);
@@ -94,7 +91,7 @@ export default function CareersApply() {
   const handlePositionChange = (value: string) => {
     setFormData({
       ...formData,
-      desired_position: value
+      selected_position: value
     });
   };
 
@@ -163,7 +160,7 @@ export default function CareersApply() {
     e.preventDefault();
 
     // Validation
-    if (!formData.full_name || !formData.email || !formData.phone || !formData.nationality || !formData.desired_position || !formData.date_of_birth || !formData.expected_salary) {
+    if (!formData.full_name || !formData.email || !formData.phone || !formData.nationality || !formData.selected_position || !formData.date_of_birth || !formData.expected_salary) {
       toast.error('Please fill in all required fields');
       return;
     }
@@ -183,7 +180,8 @@ export default function CareersApply() {
       
       await applicationsAPI.create({
         job_id: jobId!,
-        job_title: `${job!.title} - ${formData.desired_position}`,
+        job_title: job!.title,
+        selected_position: formData.selected_position,
         full_name: formData.full_name,
         email: formData.email,
         phone: formData.phone,
@@ -287,6 +285,14 @@ export default function CareersApply() {
               <CardDescription className="text-lg">
                 {job.location} • {job.salary_range}
               </CardDescription>
+              <div className="flex flex-wrap gap-2 mt-3">
+                <span className="text-sm text-gray-600 font-medium">Available Positions:</span>
+                {job.positions.map((position, idx) => (
+                  <Badge key={idx} variant="secondary">
+                    {position}
+                  </Badge>
+                ))}
+              </div>
             </CardHeader>
             <CardContent className="space-y-6">
               <div>
@@ -335,8 +341,8 @@ export default function CareersApply() {
                     <p className="text-lg font-medium">{formData.nationality}</p>
                   </div>
                   <div>
-                    <Label className="text-sm text-gray-500">Desired Position</Label>
-                    <p className="text-lg font-medium">{formData.desired_position}</p>
+                    <Label className="text-sm text-gray-500">Selected Position</Label>
+                    <p className="text-lg font-medium">{formData.selected_position}</p>
                   </div>
                   <div>
                     <Label className="text-sm text-gray-500">Date of Birth</Label>
@@ -477,19 +483,19 @@ export default function CareersApply() {
                       </Select>
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="desired_position">Desired Position *</Label>
+                      <Label htmlFor="selected_position">Select Position *</Label>
                       <Select
-                        value={formData.desired_position}
+                        value={formData.selected_position}
                         onValueChange={handlePositionChange}
                         required
                       >
                         <SelectTrigger>
-                          <SelectValue placeholder="Select desired position" />
+                          <SelectValue placeholder="Select a position" />
                         </SelectTrigger>
                         <SelectContent>
-                          {positionOptions.map((position) => (
-                            <SelectItem key={position.id} value={position.name}>
-                              {position.name}
+                          {job.positions.map((position, idx) => (
+                            <SelectItem key={idx} value={position}>
+                              {position}
                             </SelectItem>
                           ))}
                         </SelectContent>

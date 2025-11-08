@@ -137,7 +137,7 @@ export interface Application {
   date_of_birth: string | null;
   nationality: string | null;
   job_title: string;
-  position: string;
+  selected_position: string;
   experience_years: number | null;
   expected_salary: number | null;
   salary_currency: string | null;

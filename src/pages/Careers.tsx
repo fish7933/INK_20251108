@@ -91,7 +91,13 @@ export default function Careers() {
                     </div>
                     <CardTitle className="text-2xl">{job.title}</CardTitle>
                     <CardDescription className="text-base">
-                      {job.position}
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {job.positions.map((position, idx) => (
+                          <Badge key={idx} variant="secondary" className="text-xs">
+                            {position}
+                          </Badge>
+                        ))}
+                      </div>
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
@@ -105,7 +111,7 @@ export default function Careers() {
                     </div>
                     <div className="flex items-center text-gray-600">
                       <Calendar className="w-4 h-4 mr-2" />
-                      <span>Posted {new Date(job.posted_date).toLocaleDateString()}</span>
+                      <span>Posted {new Date(job.created_at).toLocaleDateString()}</span>
                     </div>
                     <Button
                       className="w-full bg-blue-600 hover:bg-blue-700"
