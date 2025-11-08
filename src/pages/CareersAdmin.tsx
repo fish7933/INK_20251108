@@ -883,6 +883,9 @@ export default function CareersAdmin() {
       return;
     }
 
+    // Close detail modal if open
+    setShowEmailRecipientDetail(false);
+    
     setSelectedEmailRecipient(recipient);
     setEmailRecipientFormData({
       email: recipient.email,
@@ -3084,7 +3087,10 @@ export default function CareersAdmin() {
                 </CardTitle>
                 <Button
                   variant="ghost"
-                  onClick={() => setShowEmailRecipientForm(false)}
+                  onClick={() => {
+                    setShowEmailRecipientForm(false);
+                    setSelectedEmailRecipient(null);
+                  }}
                 >
                   ✕
                 </Button>
@@ -3150,7 +3156,10 @@ export default function CareersAdmin() {
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => setShowEmailRecipientForm(false)}
+                    onClick={() => {
+                      setShowEmailRecipientForm(false);
+                      setSelectedEmailRecipient(null);
+                    }}
                     className="flex-1"
                     disabled={updating}
                   >
