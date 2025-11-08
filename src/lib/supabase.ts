@@ -560,6 +560,17 @@ export const adminUsersAPI = {
   },
 
   async reject(id: string): Promise<void> {
+    // Check if user is super_admin before rejecting
+    const { data: user } = await supabase
+      .from('app_7c39e793e3_admin_users')
+      .select('role')
+      .eq('id', id)
+      .single();
+
+    if (user?.role === 'super_admin') {
+      throw new Error('Cannot reject super admin accounts');
+    }
+
     const { error } = await supabase
       .from('app_7c39e793e3_admin_users')
       .delete()
@@ -569,6 +580,29 @@ export const adminUsersAPI = {
   },
 
   async delete(id: string): Promise<void> {
+    // Check if user is super_admin
+    const { data: user } = await supabase
+      .from('app_7c39e793e3_admin_users')
+      .select('role')
+      .eq('id', id)
+      .single();
+
+    if (user?.role === 'super_admin') {
+      // Count total super admins
+      const { data: superAdmins, error: countError } = await supabase
+        .from('app_7c39e793e3_admin_users')
+        .select('id')
+        .eq('role', 'super_admin');
+
+      if (countError) throw countError;
+
+      if (!superAdmins || superAdmins.length <= 1) {
+        throw new Error('Cannot delete the last super admin. At least one super admin must exist.');
+      }
+
+      throw new Error('Cannot delete super admin accounts. Please demote to admin or viewer first.');
+    }
+
     const { error } = await supabase
       .from('app_7c39e793e3_admin_users')
       .delete()
@@ -593,6 +627,17 @@ export const adminUsersAPI = {
   },
 
   async updatePermissions(id: string, permissions: AdminUser['permissions']): Promise<void> {
+    // Check if user is super_admin
+    const { data: user } = await supabase
+      .from('app_7c39e793e3_admin_users')
+      .select('role')
+      .eq('id', id)
+      .single();
+
+    if (user?.role === 'super_admin') {
+      throw new Error('Cannot modify permissions of super admin accounts');
+    }
+
     const { error } = await supabase
       .from('app_7c39e793e3_admin_users')
       .update({ permissions })
@@ -602,6 +647,34 @@ export const adminUsersAPI = {
   },
 
   async updateRole(id: string, role: AdminUser['role']): Promise<void> {
+    // Get current user data
+    const { data: user } = await supabase
+      .from('app_7c39e793e3_admin_users')
+      .select('role')
+      .eq('id', id)
+      .single();
+
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    // Prevent demoting super_admin
+    if (user.role === 'super_admin' && role !== 'super_admin') {
+      // Count total super admins
+      const { data: superAdmins, error: countError } = await supabase
+        .from('app_7c39e793e3_admin_users')
+        .select('id')
+        .eq('role', 'super_admin');
+
+      if (countError) throw countError;
+
+      if (!superAdmins || superAdmins.length <= 1) {
+        throw new Error('Cannot demote the last super admin. At least one super admin must exist.');
+      }
+
+      throw new Error('Cannot demote super admin accounts. This is a protected role.');
+    }
+
     const { error } = await supabase
       .from('app_7c39e793e3_admin_users')
       .update({ role })
