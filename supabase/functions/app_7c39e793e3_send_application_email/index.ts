@@ -67,6 +67,7 @@ Deno.serve(async (req) => {
       email: application.email,
       nationality: application.nationality,
       jobTitle: application.job_title,
+      selectedPosition: application.selected_position,
       resumeUrl: application.resume_url,
     });
 
@@ -158,8 +159,8 @@ Deno.serve(async (req) => {
       },
     });
 
-    // Prepare email content
-    const emailSubject = `New Job Application: ${application.job_title} - ${application.full_name}`;
+    // Prepare email content with selected position
+    const emailSubject = `New Job Application: ${application.job_title} - ${application.selected_position} - ${application.full_name}`;
     const emailHtml = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h2 style="color: #1e40af;">New Job Application Received</h2>
@@ -176,6 +177,7 @@ Deno.serve(async (req) => {
         <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
           <h3 style="margin-top: 0; color: #374151;">Position Details</h3>
           <p><strong>Job Title:</strong> ${application.job_title}</p>
+          <p><strong>Applied Position:</strong> <span style="color: #1e40af; font-weight: bold;">${application.selected_position}</span></p>
           <p><strong>Experience Years:</strong> ${application.experience_years || 'Not specified'}</p>
           <p><strong>Expected Salary:</strong> ${application.expected_salary ? `$${application.expected_salary.toLocaleString()} ${application.salary_currency || 'USD'}` : 'Not specified'}</p>
           <p><strong>Certificates:</strong> ${application.certificates || 'Not specified'}</p>
