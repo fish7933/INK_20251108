@@ -11,7 +11,7 @@ import Branches from './pages/Branches';
 import Contact from './pages/Contact';
 import Careers from './pages/Careers';
 import CareersApply from './pages/CareersApply';
-import CareersAdmin from './pages/CareersAdmin';
+import CareersAdmin from './pages/admin/CareersAdmin';
 import NotFound from './pages/NotFound';
 
 const queryClient = new QueryClient();
