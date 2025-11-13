@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,7 +13,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Lock, Eye, Mail, Phone, Calendar, FileText, Ship, Loader2, Plus, Edit, Trash2, UserPlus, Check, X, Key, CheckCircle2, XCircle, Info, Download, DollarSign, Paperclip, Building2, Settings, ChevronDown, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight as ChevronRightIcon } from 'lucide-react';
+import { Lock, Eye, Mail, Phone, Calendar, FileText, Ship, Loader2, Plus, Edit, Trash2, UserPlus, Check, X, Key, CheckCircle2, XCircle, Info, Download, DollarSign, Paperclip, Building2, Settings, ChevronDown, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { 
   applicationsAPI, 
@@ -39,10 +39,6 @@ import {
   SalaryRangeOption,
   NationalityOption
 } from '@/lib/supabase';
-
-type SortDirection = 'asc' | 'desc' | null;
-type ApplicationSortField = 'full_name' | 'selected_position' | 'submitted_date' | 'status';
-type JobSortField = 'title' | 'status' | 'created_at';
 
 export default function CareersAdmin() {
   const navigate = useNavigate();
@@ -82,19 +78,6 @@ export default function CareersAdmin() {
   const [newSalaryRangeName, setNewSalaryRangeName] = useState('');
   const [newNationalityName, setNewNationalityName] = useState('');
   const [openJobGroups, setOpenJobGroups] = useState<string[]>([]);
-  
-  // Sorting states
-  const [applicationSortField, setApplicationSortField] = useState<ApplicationSortField | null>(null);
-  const [applicationSortDirection, setApplicationSortDirection] = useState<SortDirection>(null);
-  const [jobSortField, setJobSortField] = useState<JobSortField | null>(null);
-  const [jobSortDirection, setJobSortDirection] = useState<SortDirection>(null);
-
-  // Pagination states
-  const [applicationPage, setApplicationPage] = useState(1);
-  const [applicationPageSize, setApplicationPageSize] = useState(10);
-  const [jobPage, setJobPage] = useState(1);
-  const [jobPageSize, setJobPageSize] = useState(10);
-
   const [adminFormData, setAdminFormData] = useState({
     username: '',
     password: '',
@@ -121,7 +104,7 @@ export default function CareersAdmin() {
   });
   const [jobFormData, setJobFormData] = useState({
     title: '',
-    positions: [] as string[],
+    position: '',
     vessel_type: '',
     location: '',
     salary_range: '',
@@ -129,230 +112,6 @@ export default function CareersAdmin() {
     responsibilities: '',
     status: 'active' as 'active' | 'closed'
   });
-
-  // Sorting functions
-  const handleApplicationSort = (field: ApplicationSortField) => {
-    if (applicationSortField === field) {
-      // Toggle direction: asc -> desc -> null
-      if (applicationSortDirection === 'asc') {
-        setApplicationSortDirection('desc');
-      } else if (applicationSortDirection === 'desc') {
-        setApplicationSortDirection(null);
-        setApplicationSortField(null);
-      }
-    } else {
-      setApplicationSortField(field);
-      setApplicationSortDirection('asc');
-    }
-    setApplicationPage(1); // Reset to first page when sorting changes
-  };
-
-  const handleJobSort = (field: JobSortField) => {
-    if (jobSortField === field) {
-      // Toggle direction: asc -> desc -> null
-      if (jobSortDirection === 'asc') {
-        setJobSortDirection('desc');
-      } else if (jobSortDirection === 'desc') {
-        setJobSortDirection(null);
-        setJobSortField(null);
-      }
-    } else {
-      setJobSortField(field);
-      setJobSortDirection('asc');
-    }
-    setJobPage(1); // Reset to first page when sorting changes
-  };
-
-  const getSortIcon = (field: string, currentField: string | null, direction: SortDirection) => {
-    if (field !== currentField || !direction) {
-      return <ArrowUpDown className="w-4 h-4 ml-1 inline opacity-30" />;
-    }
-    return direction === 'asc' ? 
-      <ArrowUp className="w-4 h-4 ml-1 inline" /> : 
-      <ArrowDown className="w-4 h-4 ml-1 inline" />;
-  };
-
-  // Sorted applications
-  const sortedApplications = useMemo(() => {
-    if (!applicationSortField || !applicationSortDirection) {
-      return applications;
-    }
-
-    return [...applications].sort((a, b) => {
-      let aValue: string | number;
-      let bValue: string | number;
-
-      switch (applicationSortField) {
-        case 'full_name':
-          aValue = a.full_name.toLowerCase();
-          bValue = b.full_name.toLowerCase();
-          break;
-        case 'selected_position':
-          aValue = a.selected_position?.toLowerCase() || '';
-          bValue = b.selected_position?.toLowerCase() || '';
-          break;
-        case 'submitted_date':
-          aValue = new Date(a.submitted_date).getTime();
-          bValue = new Date(b.submitted_date).getTime();
-          break;
-        case 'status':
-          aValue = a.status;
-          bValue = b.status;
-          break;
-        default:
-          return 0;
-      }
-
-      if (aValue < bValue) return applicationSortDirection === 'asc' ? -1 : 1;
-      if (aValue > bValue) return applicationSortDirection === 'asc' ? 1 : -1;
-      return 0;
-    });
-  }, [applications, applicationSortField, applicationSortDirection]);
-
-  // Sorted job postings
-  const sortedJobPostings = useMemo(() => {
-    if (!jobSortField || !jobSortDirection) {
-      return jobPostings;
-    }
-
-    return [...jobPostings].sort((a, b) => {
-      let aValue: string | number;
-      let bValue: string | number;
-
-      switch (jobSortField) {
-        case 'title':
-          aValue = a.title.toLowerCase();
-          bValue = b.title.toLowerCase();
-          break;
-        case 'status':
-          aValue = a.status;
-          bValue = b.status;
-          break;
-        case 'created_at':
-          aValue = new Date(a.created_at).getTime();
-          bValue = new Date(b.created_at).getTime();
-          break;
-        default:
-          return 0;
-      }
-
-      if (aValue < bValue) return jobSortDirection === 'asc' ? -1 : 1;
-      if (aValue > bValue) return jobSortDirection === 'asc' ? 1 : -1;
-      return 0;
-    });
-  }, [jobPostings, jobSortField, jobSortDirection]);
-
-  // Pagination component
-  const Pagination = ({ 
-    currentPage, 
-    totalItems, 
-    pageSize, 
-    onPageChange, 
-    onPageSizeChange 
-  }: { 
-    currentPage: number;
-    totalItems: number;
-    pageSize: number;
-    onPageChange: (page: number) => void;
-    onPageSizeChange: (size: number) => void;
-  }) => {
-    const totalPages = Math.ceil(totalItems / pageSize);
-    const startItem = (currentPage - 1) * pageSize + 1;
-    const endItem = Math.min(currentPage * pageSize, totalItems);
-
-    const getPageNumbers = () => {
-      const pages: (number | string)[] = [];
-      const maxVisible = 5;
-
-      if (totalPages <= maxVisible) {
-        for (let i = 1; i <= totalPages; i++) {
-          pages.push(i);
-        }
-      } else {
-        pages.push(1);
-        
-        if (currentPage > 3) {
-          pages.push('...');
-        }
-        
-        const start = Math.max(2, currentPage - 1);
-        const end = Math.min(totalPages - 1, currentPage + 1);
-        
-        for (let i = start; i <= end; i++) {
-          pages.push(i);
-        }
-        
-        if (currentPage < totalPages - 2) {
-          pages.push('...');
-        }
-        
-        pages.push(totalPages);
-      }
-      
-      return pages;
-    };
-
-    return (
-      <div className="flex items-center justify-between px-2 py-4">
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-700">
-            Showing {startItem} to {endItem} of {totalItems} entries
-          </span>
-          <Select value={pageSize.toString()} onValueChange={(value) => onPageSizeChange(Number(value))}>
-            <SelectTrigger className="w-[100px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="10">10 / page</SelectItem>
-              <SelectItem value="25">25 / page</SelectItem>
-              <SelectItem value="50">50 / page</SelectItem>
-              <SelectItem value="100">100 / page</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => onPageChange(currentPage - 1)}
-            disabled={currentPage === 1}
-          >
-            <ChevronLeft className="w-4 h-4" />
-            Previous
-          </Button>
-          
-          <div className="flex gap-1">
-            {getPageNumbers().map((page, index) => (
-              page === '...' ? (
-                <span key={`ellipsis-${index}`} className="px-3 py-1">...</span>
-              ) : (
-                <Button
-                  key={page}
-                  variant={currentPage === page ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => onPageChange(page as number)}
-                  className="min-w-[40px]"
-                >
-                  {page}
-                </Button>
-              )
-            ))}
-          </div>
-          
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => onPageChange(currentPage + 1)}
-            disabled={currentPage === totalPages}
-          >
-            Next
-            <ChevronRightIcon className="w-4 h-4" />
-          </Button>
-        </div>
-      </div>
-    );
-  };
 
   useEffect(() => {
     console.log('[CareersAdmin] Component mounted, checking authentication...');
@@ -733,6 +492,838 @@ export default function CareersAdmin() {
     );
   };
 
+  const handleCreateAgency = () => {
+    if (!currentUser?.permissions.settings.edit) {
+      toast.error('You do not have permission to edit settings');
+      return;
+    }
+
+    setAgencyFormData({
+      name: '',
+      contact_person: '',
+      email: '',
+      phone: '',
+      address: '',
+      is_active: true
+    });
+    setSelectedAgency(null);
+    setShowAgencyForm(true);
+  };
+
+  const handleEditAgency = (agency: Agency) => {
+    if (!currentUser?.permissions.settings.edit) {
+      toast.error('You do not have permission to edit settings');
+      return;
+    }
+
+    setSelectedAgency(agency);
+    setAgencyFormData({
+      name: agency.name,
+      contact_person: agency.contact_person || '',
+      email: agency.email || '',
+      phone: agency.phone || '',
+      address: agency.address || '',
+      is_active: agency.is_active
+    });
+    setShowAgencyForm(true);
+  };
+
+  const handleSaveAgency = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!agencyFormData.name) {
+      toast.error('Please enter agency name');
+      return;
+    }
+
+    try {
+      setUpdating(true);
+      
+      const agencyData = {
+        name: agencyFormData.name,
+        contact_person: agencyFormData.contact_person || null,
+        email: agencyFormData.email || null,
+        phone: agencyFormData.phone || null,
+        address: agencyFormData.address || null,
+        is_active: agencyFormData.is_active
+      };
+
+      if (selectedAgency) {
+        await agenciesAPI.update(selectedAgency.id, agencyData);
+        setAgencies(agencies.map(a =>
+          a.id === selectedAgency.id ? { ...a, ...agencyData } : a
+        ));
+        toast.success('Agency updated successfully');
+      } else {
+        const newAgency = await agenciesAPI.create(agencyData);
+        setAgencies([newAgency, ...agencies]);
+        toast.success('Agency added successfully');
+      }
+      
+      setShowAgencyForm(false);
+      setSelectedAgency(null);
+    } catch (error) {
+      console.error('Error saving agency:', error);
+      toast.error('Failed to save agency');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleToggleAgencyActive = async (id: string, isActive: boolean) => {
+    if (!currentUser?.permissions.settings.edit) {
+      toast.error('You do not have permission to edit settings');
+      return;
+    }
+
+    try {
+      setUpdating(true);
+      await agenciesAPI.toggleActive(id, isActive);
+      setAgencies(agencies.map(a =>
+        a.id === id ? { ...a, is_active: isActive } : a
+      ));
+      toast.success(`Agency ${isActive ? 'activated' : 'deactivated'}`);
+    } catch (error) {
+      console.error('Error toggling agency:', error);
+      toast.error('Failed to update agency');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleDeleteAgency = async (id: string) => {
+    if (!currentUser?.permissions.settings.edit) {
+      toast.error('You do not have permission to edit settings');
+      return;
+    }
+
+    if (!confirm('Are you sure you want to delete this agency?')) {
+      return;
+    }
+
+    try {
+      setUpdating(true);
+      await agenciesAPI.delete(id);
+      setAgencies(agencies.filter(a => a.id !== id));
+      toast.success('Agency deleted successfully');
+    } catch (error) {
+      console.error('Error deleting agency:', error);
+      toast.error('Failed to delete agency');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleAddPosition = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!currentUser?.permissions.settings.edit) {
+      toast.error('You do not have permission to edit settings');
+      return;
+    }
+
+    if (!newPositionName.trim()) {
+      toast.error('Please enter a position name');
+      return;
+    }
+
+    try {
+      setUpdating(true);
+      const newPosition = await positionOptionsAPI.create(newPositionName.trim());
+      setPositionOptions([...positionOptions, newPosition].sort((a, b) => a.name.localeCompare(b.name)));
+      setNewPositionName('');
+      toast.success('Position added successfully');
+    } catch (error) {
+      console.error('Error adding position:', error);
+      toast.error('Failed to add position');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleDeletePosition = async (id: string) => {
+    if (!currentUser?.permissions.settings.edit) {
+      toast.error('You do not have permission to edit settings');
+      return;
+    }
+
+    if (!confirm('Are you sure you want to delete this position?')) {
+      return;
+    }
+
+    try {
+      setUpdating(true);
+      await positionOptionsAPI.delete(id);
+      setPositionOptions(positionOptions.filter(pos => pos.id !== id));
+      toast.success('Position deleted successfully');
+    } catch (error) {
+      console.error('Error deleting position:', error);
+      toast.error('Failed to delete position');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleAddVesselType = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!currentUser?.permissions.settings.edit) {
+      toast.error('You do not have permission to edit settings');
+      return;
+    }
+
+    if (!newVesselTypeName.trim()) {
+      toast.error('Please enter a vessel type name');
+      return;
+    }
+
+    try {
+      setUpdating(true);
+      const newVesselType = await vesselTypeOptionsAPI.create(newVesselTypeName.trim());
+      setVesselTypeOptions([...vesselTypeOptions, newVesselType].sort((a, b) => a.name.localeCompare(b.name)));
+      setNewVesselTypeName('');
+      toast.success('Vessel type added successfully');
+    } catch (error) {
+      console.error('Error adding vessel type:', error);
+      toast.error('Failed to add vessel type');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleDeleteVesselType = async (id: string) => {
+    if (!currentUser?.permissions.settings.edit) {
+      toast.error('You do not have permission to edit settings');
+      return;
+    }
+
+    if (!confirm('Are you sure you want to delete this vessel type?')) {
+      return;
+    }
+
+    try {
+      setUpdating(true);
+      await vesselTypeOptionsAPI.delete(id);
+      setVesselTypeOptions(vesselTypeOptions.filter(vt => vt.id !== id));
+      toast.success('Vessel type deleted successfully');
+    } catch (error) {
+      console.error('Error deleting vessel type:', error);
+      toast.error('Failed to delete vessel type');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleAddLocation = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!currentUser?.permissions.settings.edit) {
+      toast.error('You do not have permission to edit settings');
+      return;
+    }
+
+    if (!newLocationName.trim()) {
+      toast.error('Please enter a location name');
+      return;
+    }
+
+    try {
+      setUpdating(true);
+      const newLocation = await locationOptionsAPI.create(newLocationName.trim());
+      setLocationOptions([...locationOptions, newLocation].sort((a, b) => a.name.localeCompare(b.name)));
+      setNewLocationName('');
+      toast.success('Location added successfully');
+    } catch (error) {
+      console.error('Error adding location:', error);
+      toast.error('Failed to add location');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleDeleteLocation = async (id: string) => {
+    if (!currentUser?.permissions.settings.edit) {
+      toast.error('You do not have permission to edit settings');
+      return;
+    }
+
+    if (!confirm('Are you sure you want to delete this location?')) {
+      return;
+    }
+
+    try {
+      setUpdating(true);
+      await locationOptionsAPI.delete(id);
+      setLocationOptions(locationOptions.filter(loc => loc.id !== id));
+      toast.success('Location deleted successfully');
+    } catch (error) {
+      console.error('Error deleting location:', error);
+      toast.error('Failed to delete location');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleAddSalaryRange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!currentUser?.permissions.settings.edit) {
+      toast.error('You do not have permission to edit settings');
+      return;
+    }
+
+    if (!newSalaryRangeName.trim()) {
+      toast.error('Please enter a salary range');
+      return;
+    }
+
+    try {
+      setUpdating(true);
+      const newSalaryRange = await salaryRangeOptionsAPI.create(newSalaryRangeName.trim());
+      setSalaryRangeOptions([...salaryRangeOptions, newSalaryRange].sort((a, b) => a.name.localeCompare(b.name)));
+      setNewSalaryRangeName('');
+      toast.success('Salary range added successfully');
+    } catch (error) {
+      console.error('Error adding salary range:', error);
+      toast.error('Failed to add salary range');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleDeleteSalaryRange = async (id: string) => {
+    if (!currentUser?.permissions.settings.edit) {
+      toast.error('You do not have permission to edit settings');
+      return;
+    }
+
+    if (!confirm('Are you sure you want to delete this salary range?')) {
+      return;
+    }
+
+    try {
+      setUpdating(true);
+      await salaryRangeOptionsAPI.delete(id);
+      setSalaryRangeOptions(salaryRangeOptions.filter(sr => sr.id !== id));
+      toast.success('Salary range deleted successfully');
+    } catch (error) {
+      console.error('Error deleting salary range:', error);
+      toast.error('Failed to delete salary range');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleAddNationality = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!currentUser?.permissions.settings.edit) {
+      toast.error('You do not have permission to edit settings');
+      return;
+    }
+
+    if (!newNationalityName.trim()) {
+      toast.error('Please enter a nationality');
+      return;
+    }
+
+    try {
+      setUpdating(true);
+      const newNationality = await nationalityOptionsAPI.create(newNationalityName.trim());
+      setNationalityOptions([...nationalityOptions, newNationality].sort((a, b) => a.name.localeCompare(b.name)));
+      setNewNationalityName('');
+      toast.success('Nationality added successfully');
+    } catch (error) {
+      console.error('Error adding nationality:', error);
+      toast.error('Failed to add nationality');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleDeleteNationality = async (id: string) => {
+    if (!currentUser?.permissions.settings.edit) {
+      toast.error('You do not have permission to edit settings');
+      return;
+    }
+
+    if (!confirm('Are you sure you want to delete this nationality?')) {
+      return;
+    }
+
+    try {
+      setUpdating(true);
+      await nationalityOptionsAPI.delete(id);
+      setNationalityOptions(nationalityOptions.filter(nat => nat.id !== id));
+      toast.success('Nationality deleted successfully');
+    } catch (error) {
+      console.error('Error deleting nationality:', error);
+      toast.error('Failed to delete nationality');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleCreateEmailRecipient = () => {
+    if (!currentUser?.permissions.settings.edit) {
+      toast.error('You do not have permission to edit settings');
+      return;
+    }
+
+    setEmailRecipientFormData({
+      email: '',
+      name: '',
+      nationality: 'all',
+      is_active: true
+    });
+    setSelectedEmailRecipient(null);
+    setShowEmailRecipientForm(true);
+  };
+
+  const handleViewEmailRecipient = (recipient: EmailRecipient) => {
+    setSelectedEmailRecipient(recipient);
+    setShowEmailRecipientDetail(true);
+  };
+
+  const handleEditEmailRecipient = (recipient: EmailRecipient) => {
+    if (!currentUser?.permissions.settings.edit) {
+      toast.error('You do not have permission to edit settings');
+      return;
+    }
+
+    // Close detail modal if open
+    setShowEmailRecipientDetail(false);
+    
+    setSelectedEmailRecipient(recipient);
+    setEmailRecipientFormData({
+      email: recipient.email,
+      name: recipient.name,
+      nationality: recipient.nationality || 'all',
+      is_active: recipient.is_active
+    });
+    setShowEmailRecipientForm(true);
+  };
+
+  const handleSaveEmailRecipient = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!emailRecipientFormData.email || !emailRecipientFormData.name) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+
+    try {
+      setUpdating(true);
+      
+      const recipientData = {
+        email: emailRecipientFormData.email,
+        name: emailRecipientFormData.name,
+        nationality: emailRecipientFormData.nationality === 'all' ? null : emailRecipientFormData.nationality,
+        is_active: emailRecipientFormData.is_active
+      };
+
+      if (selectedEmailRecipient) {
+        await emailRecipientsAPI.update(selectedEmailRecipient.id, recipientData);
+        setEmailRecipients(emailRecipients.map(r =>
+          r.id === selectedEmailRecipient.id ? { ...r, ...recipientData } : r
+        ));
+        toast.success('Email recipient updated successfully');
+      } else {
+        const newRecipient = await emailRecipientsAPI.create(recipientData);
+        setEmailRecipients([newRecipient, ...emailRecipients]);
+        toast.success('Email recipient added successfully');
+      }
+      
+      setShowEmailRecipientForm(false);
+      setSelectedEmailRecipient(null);
+    } catch (error) {
+      console.error('Error saving email recipient:', error);
+      toast.error('Failed to save email recipient');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleToggleEmailRecipientActive = async (id: string, isActive: boolean) => {
+    if (!currentUser?.permissions.settings.edit) {
+      toast.error('You do not have permission to edit settings');
+      return;
+    }
+
+    try {
+      setUpdating(true);
+      await emailRecipientsAPI.toggleActive(id, isActive);
+      setEmailRecipients(emailRecipients.map(r =>
+        r.id === id ? { ...r, is_active: isActive } : r
+      ));
+      toast.success(`Email recipient ${isActive ? 'activated' : 'deactivated'}`);
+    } catch (error) {
+      console.error('Error toggling email recipient:', error);
+      toast.error('Failed to update email recipient');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleDeleteEmailRecipient = async (id: string) => {
+    if (!currentUser?.permissions.settings.edit) {
+      toast.error('You do not have permission to edit settings');
+      return;
+    }
+
+    if (!confirm('Are you sure you want to delete this email recipient?')) {
+      return;
+    }
+
+    try {
+      setUpdating(true);
+      await emailRecipientsAPI.delete(id);
+      setEmailRecipients(emailRecipients.filter(r => r.id !== id));
+      toast.success('Email recipient deleted successfully');
+    } catch (error) {
+      console.error('Error deleting email recipient:', error);
+      toast.error('Failed to delete email recipient');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleJobFormChange = (field: string, value: string) => {
+    setJobFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const resetJobForm = () => {
+    setJobFormData({
+      title: '',
+      position: '',
+      vessel_type: '',
+      location: '',
+      salary_range: '',
+      requirements: '',
+      responsibilities: '',
+      status: 'active'
+    });
+    setSelectedJob(null);
+    setShowJobForm(false);
+  };
+
+  const handleCreateJob = () => {
+    if (!currentUser?.permissions.jobs.edit) {
+      toast.error('You do not have permission to create job postings');
+      return;
+    }
+
+    resetJobForm();
+    setShowJobForm(true);
+  };
+
+  const handleEditJob = (job: JobPosting) => {
+    if (!currentUser?.permissions.jobs.edit) {
+      toast.error('You do not have permission to edit job postings');
+      return;
+    }
+
+    setSelectedJob(job);
+    setJobFormData({
+      title: job.title,
+      position: job.position,
+      vessel_type: job.vessel_type,
+      location: job.location,
+      salary_range: job.salary_range,
+      requirements: job.requirements.join('\n'),
+      responsibilities: job.responsibilities.join('\n'),
+      status: job.status
+    });
+    setShowJobForm(true);
+  };
+
+  const handleSaveJob = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!jobFormData.title || !jobFormData.position || !jobFormData.vessel_type) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+
+    try {
+      setUpdating(true);
+      
+      const jobData = {
+        title: jobFormData.title,
+        position: jobFormData.position,
+        vessel_type: jobFormData.vessel_type,
+        location: jobFormData.location,
+        salary_range: jobFormData.salary_range,
+        requirements: jobFormData.requirements.split('\n').filter(r => r.trim()),
+        responsibilities: jobFormData.responsibilities.split('\n').filter(r => r.trim()),
+        status: jobFormData.status
+      };
+
+      if (selectedJob) {
+        await jobPostingsAPI.update(selectedJob.id, jobData);
+        setJobPostings(jobPostings.map(job =>
+          job.id === selectedJob.id ? { ...job, ...jobData } : job
+        ));
+        toast.success('Job posting updated successfully');
+      } else {
+        const newJob = await jobPostingsAPI.create(jobData);
+        setJobPostings([newJob, ...jobPostings]);
+        toast.success('Job posting created successfully');
+      }
+      
+      resetJobForm();
+    } catch (error) {
+      console.error('Error saving job:', error);
+      toast.error('Failed to save job posting');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleRequestAdminAccess = () => {
+    setAdminFormData({
+      username: '',
+      password: '',
+      confirmPassword: '',
+      role: 'viewer'
+    });
+    setShowAdminForm(true);
+  };
+
+  const handleCreateAdmin = () => {
+    setAdminFormData({
+      username: '',
+      password: '',
+      confirmPassword: '',
+      role: 'viewer'
+    });
+    setShowAdminForm(true);
+  };
+
+  const handleSaveAdmin = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!adminFormData.username || !adminFormData.password) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+
+    if (adminFormData.password !== adminFormData.confirmPassword) {
+      toast.error('Passwords do not match');
+      return;
+    }
+
+    if (adminFormData.password.length < 6) {
+      toast.error('Password must be at least 6 characters');
+      return;
+    }
+
+    try {
+      setUpdating(true);
+      const newAdmin = await adminUsersAPI.create(
+        adminFormData.username,
+        adminFormData.password,
+        adminFormData.role
+      );
+      
+      setAdminUsers([...adminUsers, newAdmin]);
+      setShowAdminForm(false);
+      toast.success('Admin user created successfully. Waiting for approval.');
+    } catch (error) {
+      console.error('Error creating admin:', error);
+      toast.error('Failed to create admin user');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleApproveAdmin = async (id: string) => {
+    if (!currentUser?.permissions.admins.edit) {
+      toast.error('You do not have permission to approve admins');
+      return;
+    }
+
+    try {
+      setUpdating(true);
+      await adminUsersAPI.approve(id);
+      setAdminUsers(adminUsers.map(admin =>
+        admin.id === id ? { ...admin, is_approved: true } : admin
+      ));
+      toast.success('Admin approved successfully');
+    } catch (error) {
+      console.error('Error approving admin:', error);
+      toast.error('Failed to approve admin');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleRejectAdmin = async (id: string) => {
+    if (!currentUser?.permissions.admins.edit) {
+      toast.error('You do not have permission to reject admins');
+      return;
+    }
+
+    if (!confirm('Are you sure you want to reject this admin request?')) {
+      return;
+    }
+
+    try {
+      setUpdating(true);
+      await adminUsersAPI.reject(id);
+      setAdminUsers(adminUsers.filter(admin => admin.id !== id));
+      toast.success('Admin request rejected');
+    } catch (error) {
+      console.error('Error rejecting admin:', error);
+      toast.error('Failed to reject admin');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleDeleteAdmin = async (id: string) => {
+    if (!currentUser?.permissions.admins.edit) {
+      toast.error('You do not have permission to delete admins');
+      return;
+    }
+
+    if (id === currentUser?.id) {
+      toast.error('You cannot delete your own account');
+      return;
+    }
+
+    if (!confirm('Are you sure you want to delete this admin?')) {
+      return;
+    }
+
+    try {
+      setUpdating(true);
+      await adminUsersAPI.delete(id);
+      setAdminUsers(adminUsers.filter(admin => admin.id !== id));
+      toast.success('Admin deleted successfully');
+    } catch (error) {
+      console.error('Error deleting admin:', error);
+      toast.error('Failed to delete admin');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleChangePassword = (admin: Omit<AdminUser, 'password_hash'>) => {
+    if (currentUser?.id !== admin.id && !currentUser?.permissions.admins.edit) {
+      toast.error('You can only change your own password');
+      return;
+    }
+
+    setSelectedAdmin(admin);
+    setPasswordFormData({
+      newPassword: '',
+      confirmPassword: ''
+    });
+    setShowPasswordForm(true);
+  };
+
+  const handleSavePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!passwordFormData.newPassword) {
+      toast.error('Please enter a new password');
+      return;
+    }
+
+    if (passwordFormData.newPassword !== passwordFormData.confirmPassword) {
+      toast.error('Passwords do not match');
+      return;
+    }
+
+    if (passwordFormData.newPassword.length < 6) {
+      toast.error('Password must be at least 6 characters');
+      return;
+    }
+
+    try {
+      setUpdating(true);
+      await adminUsersAPI.updatePassword(selectedAdmin!.id, passwordFormData.newPassword);
+      setShowPasswordForm(false);
+      setSelectedAdmin(null);
+      toast.success('Password updated successfully');
+    } catch (error) {
+      console.error('Error updating password:', error);
+      toast.error('Failed to update password');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleEditPermissions = (admin: Omit<AdminUser, 'password_hash'>) => {
+    if (!currentUser?.permissions.admins.edit) {
+      toast.error('You do not have permission to edit permissions');
+      return;
+    }
+
+    setSelectedAdmin(admin);
+    setShowPermissionsForm(true);
+  };
+
+  const handleUpdatePermissions = async (adminId: string, category: string, action: string, value: boolean) => {
+    if (!currentUser?.permissions.admins.edit) {
+      toast.error('You do not have permission to update permissions');
+      return;
+    }
+
+    const admin = adminUsers.find(a => a.id === adminId);
+    if (!admin) return;
+
+    const updatedPermissions = {
+      ...admin.permissions,
+      [category]: {
+        ...admin.permissions[category as keyof typeof admin.permissions],
+        [action]: value
+      }
+    };
+
+    try {
+      setUpdating(true);
+      await adminUsersAPI.updatePermissions(adminId, updatedPermissions);
+      setAdminUsers(adminUsers.map(a =>
+        a.id === adminId ? { ...a, permissions: updatedPermissions } : a
+      ));
+      
+      // Update selectedAdmin if it's the same admin
+      if (selectedAdmin?.id === adminId) {
+        setSelectedAdmin({ ...selectedAdmin, permissions: updatedPermissions });
+      }
+      
+      toast.success('Permissions updated');
+    } catch (error) {
+      console.error('Error updating permissions:', error);
+      toast.error('Failed to update permissions');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleUpdateRole = async (adminId: string, role: AdminUser['role']) => {
+    if (!currentUser?.permissions.admins.edit) {
+      toast.error('You do not have permission to update roles');
+      return;
+    }
+
+    try {
+      setUpdating(true);
+      await adminUsersAPI.updateRole(adminId, role);
+      setAdminUsers(adminUsers.map(a =>
+        a.id === adminId ? { ...a, role } : a
+      ));
+      toast.success('Role updated');
+    } catch (error) {
+      console.error('Error updating role:', error);
+      toast.error('Failed to update role');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
   const getStatusBadge = (status: Application['status']) => {
     const variants = {
       pending: 'bg-yellow-100 text-yellow-800',
@@ -804,16 +1395,6 @@ export default function CareersAdmin() {
     const allSelected = appList.length > 0 && selectedApplicationIds.length === appList.length;
     const canDelete = currentUser?.permissions.applications.delete;
     
-    // Use sorted applications
-    const displayList = applicationSortField && applicationSortDirection 
-      ? sortedApplications.filter(app => appList.some(a => a.id === app.id))
-      : appList;
-    
-    // Apply pagination
-    const startIndex = (applicationPage - 1) * applicationPageSize;
-    const endIndex = startIndex + applicationPageSize;
-    const paginatedList = displayList.slice(startIndex, endIndex);
-    
     return (
       <>
         {appList.length > 0 && selectedApplicationIds.length > 0 && canDelete && (
@@ -838,108 +1419,71 @@ export default function CareersAdmin() {
             No applications yet
           </p>
         ) : (
-          <>
-            <Table>
-              <TableHeader>
-                <TableRow>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                {canDelete && (
+                  <TableHead className="w-12">
+                    <Checkbox
+                      checked={allSelected}
+                      onCheckedChange={() => toggleSelectAllApplications(appList)}
+                    />
+                  </TableHead>
+                )}
+                <TableHead>Name</TableHead>
+                <TableHead>Position</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Submitted</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Email Notification</TableHead>
+                <TableHead>Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {appList.map((app) => (
+                <TableRow key={app.id}>
                   {canDelete && (
-                    <TableHead className="w-12">
+                    <TableCell>
                       <Checkbox
-                        checked={allSelected}
-                        onCheckedChange={() => toggleSelectAllApplications(appList)}
+                        checked={selectedApplicationIds.includes(app.id)}
+                        onCheckedChange={() => toggleApplicationSelection(app.id)}
                       />
-                    </TableHead>
-                  )}
-                  <TableHead 
-                    className="cursor-pointer select-none hover:bg-gray-50"
-                    onClick={() => handleApplicationSort('full_name')}
-                  >
-                    Name
-                    {getSortIcon('full_name', applicationSortField, applicationSortDirection)}
-                  </TableHead>
-                  <TableHead 
-                    className="cursor-pointer select-none hover:bg-gray-50"
-                    onClick={() => handleApplicationSort('selected_position')}
-                  >
-                    Position
-                    {getSortIcon('selected_position', applicationSortField, applicationSortDirection)}
-                  </TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead 
-                    className="cursor-pointer select-none hover:bg-gray-50"
-                    onClick={() => handleApplicationSort('submitted_date')}
-                  >
-                    Submitted
-                    {getSortIcon('submitted_date', applicationSortField, applicationSortDirection)}
-                  </TableHead>
-                  <TableHead 
-                    className="cursor-pointer select-none hover:bg-gray-50"
-                    onClick={() => handleApplicationSort('status')}
-                  >
-                    Status
-                    {getSortIcon('status', applicationSortField, applicationSortDirection)}
-                  </TableHead>
-                  <TableHead>Email Notification</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {paginatedList.map((app) => (
-                  <TableRow key={app.id}>
-                    {canDelete && (
-                      <TableCell>
-                        <Checkbox
-                          checked={selectedApplicationIds.includes(app.id)}
-                          onCheckedChange={() => toggleApplicationSelection(app.id)}
-                        />
-                      </TableCell>
-                    )}
-                    <TableCell className="font-medium">{app.full_name}</TableCell>
-                    <TableCell>{app.selected_position}</TableCell>
-                    <TableCell>{app.email}</TableCell>
-                    <TableCell>
-                      {new Date(app.submitted_date).toLocaleDateString()}
                     </TableCell>
-                    <TableCell>{getStatusBadge(app.status)}</TableCell>
-                    <TableCell>{getEmailStatusBadge(app)}</TableCell>
-                    <TableCell>
-                      <div className="flex gap-2">
+                  )}
+                  <TableCell className="font-medium">{app.full_name}</TableCell>
+                  <TableCell>{app.job_title}</TableCell>
+                  <TableCell>{app.email}</TableCell>
+                  <TableCell>
+                    {new Date(app.submitted_date).toLocaleDateString()}
+                  </TableCell>
+                  <TableCell>{getStatusBadge(app.status)}</TableCell>
+                  <TableCell>{getEmailStatusBadge(app)}</TableCell>
+                  <TableCell>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setSelectedApplication(app)}
+                      >
+                        <Eye className="w-4 h-4 mr-1" />
+                        View
+                      </Button>
+                      {canDelete && (
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => setSelectedApplication(app)}
+                          onClick={() => handleDeleteApplication(app.id)}
+                          disabled={updating}
                         >
-                          <Eye className="w-4 h-4 mr-1" />
-                          View
+                          <Trash2 className="w-4 h-4" />
                         </Button>
-                        {canDelete && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleDeleteApplication(app.id)}
-                            disabled={updating}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-            
-            <Pagination
-              currentPage={applicationPage}
-              totalItems={displayList.length}
-              pageSize={applicationPageSize}
-              onPageChange={setApplicationPage}
-              onPageSizeChange={(size) => {
-                setApplicationPageSize(size);
-                setApplicationPage(1);
-              }}
-            />
-          </>
+                      )}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         )}
       </>
     );
@@ -947,7 +1491,7 @@ export default function CareersAdmin() {
 
   const renderApplicationsByJob = () => {
     // Group applications by job title
-    const applicationsByJob = sortedApplications.reduce((acc, app) => {
+    const applicationsByJob = applications.reduce((acc, app) => {
       const jobTitle = app.job_title;
       if (!acc[jobTitle]) {
         acc[jobTitle] = [];
@@ -1099,9 +1643,106 @@ export default function CareersAdmin() {
                   Back to Careers
                 </Button>
               </form>
+              <div className="mt-6 pt-6 border-t">
+                <p className="text-sm text-gray-600 mb-2">Don't have an account?</p>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={handleRequestAdminAccess}
+                >
+                  <UserPlus className="w-4 h-4 mr-2" />
+                  Request Admin Access
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </div>
+
+        {/* Admin Form Modal for Request Access */}
+        {showAdminForm && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+            <Card className="max-w-md w-full">
+              <CardHeader>
+                <div className="flex justify-between items-start">
+                  <CardTitle className="text-2xl">Request Admin Access</CardTitle>
+                  <Button
+                    variant="ghost"
+                    onClick={() => setShowAdminForm(false)}
+                  >
+                    ✕
+                  </Button>
+                </div>
+                <CardDescription>
+                  Your request will need to be approved by an existing admin
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleSaveAdmin} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="new_username">Username *</Label>
+                    <Input
+                      id="new_username"
+                      value={adminFormData.username}
+                      onChange={(e) => setAdminFormData({ ...adminFormData, username: e.target.value })}
+                      placeholder="Enter username"
+                      required
+                      disabled={updating}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="new_password">Password *</Label>
+                    <Input
+                      id="new_password"
+                      type="password"
+                      value={adminFormData.password}
+                      onChange={(e) => setAdminFormData({ ...adminFormData, password: e.target.value })}
+                      placeholder="Enter password (min 6 characters)"
+                      required
+                      disabled={updating}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="confirm_password">Confirm Password *</Label>
+                    <Input
+                      id="confirm_password"
+                      type="password"
+                      value={adminFormData.confirmPassword}
+                      onChange={(e) => setAdminFormData({ ...adminFormData, confirmPassword: e.target.value })}
+                      placeholder="Confirm password"
+                      required
+                      disabled={updating}
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setShowAdminForm(false)}
+                      className="flex-1"
+                      disabled={updating}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="submit"
+                      className="flex-1 bg-blue-600 hover:bg-blue-700"
+                      disabled={updating}
+                    >
+                      {updating ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Submitting...
+                        </>
+                      ) : (
+                        'Submit Request'
+                      )}
+                    </Button>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+          </div>
+        )}
       </div>
     );
   }
@@ -1203,12 +1844,9 @@ export default function CareersAdmin() {
                     <Card>
                       <CardHeader>
                         <CardTitle>All Applications</CardTitle>
-                        <CardDescription>
-                          Click column headers to sort
-                        </CardDescription>
                       </CardHeader>
                       <CardContent>
-                        {renderApplicationTable(sortedApplications)}
+                        {renderApplicationTable(applications)}
                       </CardContent>
                     </Card>
                   </TabsContent>
@@ -1218,7 +1856,7 @@ export default function CareersAdmin() {
                       <CardHeader>
                         <CardTitle>Applications by Job Posting</CardTitle>
                         <CardDescription>
-                          Click on a job posting to expand and view its applications. Click column headers to sort.
+                          Click on a job posting to expand and view its applications
                         </CardDescription>
                       </CardHeader>
                       <CardContent>
@@ -1231,12 +1869,9 @@ export default function CareersAdmin() {
                     <Card>
                       <CardHeader>
                         <CardTitle>Pending Applications</CardTitle>
-                        <CardDescription>
-                          Click column headers to sort
-                        </CardDescription>
                       </CardHeader>
                       <CardContent>
-                        {renderApplicationTable(sortedApplications.filter(a => a.status === 'pending'))}
+                        {renderApplicationTable(applications.filter(a => a.status === 'pending'))}
                       </CardContent>
                     </Card>
                   </TabsContent>
@@ -1245,12 +1880,9 @@ export default function CareersAdmin() {
                     <Card>
                       <CardHeader>
                         <CardTitle>Shortlisted Candidates</CardTitle>
-                        <CardDescription>
-                          Click column headers to sort
-                        </CardDescription>
                       </CardHeader>
                       <CardContent>
-                        {renderApplicationTable(sortedApplications.filter(a => a.status === 'shortlisted'))}
+                        {renderApplicationTable(applications.filter(a => a.status === 'shortlisted'))}
                       </CardContent>
                     </Card>
                   </TabsContent>
@@ -1263,14 +1895,9 @@ export default function CareersAdmin() {
                 <Card>
                   <CardHeader>
                     <div className="flex justify-between items-center">
-                      <div>
-                        <CardTitle>Job Postings</CardTitle>
-                        <CardDescription>
-                          Click column headers to sort
-                        </CardDescription>
-                      </div>
+                      <CardTitle>Job Postings</CardTitle>
                       {currentUser?.permissions.jobs.edit && (
-                        <Button onClick={() => {}}>
+                        <Button onClick={handleCreateJob}>
                           <Plus className="w-4 h-4 mr-2" />
                           Create Job
                         </Button>
@@ -1300,103 +1927,1489 @@ export default function CareersAdmin() {
                         No job postings yet
                       </p>
                     ) : (
-                      <>
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            {currentUser?.permissions.jobs.delete && (
+                              <TableHead className="w-12">
+                                <Checkbox
+                                  checked={selectedJobIds.length === jobPostings.length}
+                                  onCheckedChange={toggleSelectAllJobs}
+                                />
+                              </TableHead>
+                            )}
+                            <TableHead>Title</TableHead>
+                            <TableHead>Position</TableHead>
+                            <TableHead>Vessel Type</TableHead>
+                            <TableHead>Location</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead>Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {jobPostings.map((job) => (
+                            <TableRow key={job.id}>
                               {currentUser?.permissions.jobs.delete && (
-                                <TableHead className="w-12">
-                                  <Checkbox
-                                    checked={selectedJobIds.length === jobPostings.length}
-                                    onCheckedChange={toggleSelectAllJobs}
-                                  />
-                                </TableHead>
-                              )}
-                              <TableHead 
-                                className="cursor-pointer select-none hover:bg-gray-50"
-                                onClick={() => handleJobSort('title')}
-                              >
-                                Title
-                                {getSortIcon('title', jobSortField, jobSortDirection)}
-                              </TableHead>
-                              <TableHead>Positions</TableHead>
-                              <TableHead>Vessel Type</TableHead>
-                              <TableHead>Location</TableHead>
-                              <TableHead 
-                                className="cursor-pointer select-none hover:bg-gray-50"
-                                onClick={() => handleJobSort('status')}
-                              >
-                                Status
-                                {getSortIcon('status', jobSortField, jobSortDirection)}
-                              </TableHead>
-                              <TableHead>Actions</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {sortedJobPostings
-                              .slice((jobPage - 1) * jobPageSize, jobPage * jobPageSize)
-                              .map((job) => (
-                              <TableRow key={job.id}>
-                                {currentUser?.permissions.jobs.delete && (
-                                  <TableCell>
-                                    <Checkbox
-                                      checked={selectedJobIds.includes(job.id)}
-                                      onCheckedChange={() => toggleJobSelection(job.id)}
-                                    />
-                                  </TableCell>
-                                )}
-                                <TableCell className="font-medium">{job.title}</TableCell>
-                                <TableCell>{job.positions?.join(", ") || "N/A"}</TableCell>
-                                <TableCell>{job.vessel_type}</TableCell>
-                                <TableCell>{job.location}</TableCell>
-                                <TableCell>{getJobStatusBadge(job.status)}</TableCell>
                                 <TableCell>
-                                  <div className="flex gap-2">
-                                    {currentUser?.permissions.jobs.edit && (
-                                      <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => {}}
-                                      >
-                                        <Edit className="w-4 h-4" />
-                                      </Button>
-                                    )}
-                                    {currentUser?.permissions.jobs.delete && (
-                                      <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => handleDeleteJob(job.id)}
-                                        disabled={updating}
-                                      >
-                                        <Trash2 className="w-4 h-4" />
-                                      </Button>
-                                    )}
-                                  </div>
+                                  <Checkbox
+                                    checked={selectedJobIds.includes(job.id)}
+                                    onCheckedChange={() => toggleJobSelection(job.id)}
+                                  />
                                 </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                        
-                        <Pagination
-                          currentPage={jobPage}
-                          totalItems={sortedJobPostings.length}
-                          pageSize={jobPageSize}
-                          onPageChange={setJobPage}
-                          onPageSizeChange={(size) => {
-                            setJobPageSize(size);
-                            setJobPage(1);
-                          }}
-                        />
-                      </>
+                              )}
+                              <TableCell className="font-medium">{job.title}</TableCell>
+                              <TableCell>{job.position}</TableCell>
+                              <TableCell>{job.vessel_type}</TableCell>
+                              <TableCell>{job.location}</TableCell>
+                              <TableCell>{getJobStatusBadge(job.status)}</TableCell>
+                              <TableCell>
+                                <div className="flex gap-2">
+                                  {currentUser?.permissions.jobs.edit && (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => handleEditJob(job)}
+                                    >
+                                      <Edit className="w-4 h-4" />
+                                    </Button>
+                                  )}
+                                  {currentUser?.permissions.jobs.delete && (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => handleDeleteJob(job.id)}
+                                      disabled={updating}
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                  )}
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
                     )}
                   </CardContent>
                 </Card>
               </TabsContent>
             )}
+
+            {currentUser?.permissions.admins.view && (
+              <TabsContent value="admins" className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <div className="flex justify-between items-center">
+                      <CardTitle>Admin Users</CardTitle>
+                      {currentUser?.permissions.admins.edit && (
+                        <Button onClick={handleCreateAdmin}>
+                          <UserPlus className="w-4 h-4 mr-2" />
+                          Create Admin
+                        </Button>
+                      )}
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    {adminUsers.length === 0 ? (
+                      <p className="text-center py-8 text-gray-500">
+                        No admin users yet
+                      </p>
+                    ) : (
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Username</TableHead>
+                            <TableHead>Role</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead>Created</TableHead>
+                            <TableHead>Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {adminUsers.map((admin) => (
+                            <TableRow key={admin.id}>
+                              <TableCell className="font-medium">{admin.username}</TableCell>
+                              <TableCell>
+                                {currentUser?.permissions.admins.edit && admin.is_approved ? (
+                                  <Select
+                                    value={admin.role}
+                                    onValueChange={(value) => handleUpdateRole(admin.id, value as AdminUser['role'])}
+                                    disabled={updating}
+                                  >
+                                    <SelectTrigger className="w-[140px]">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="viewer">Viewer</SelectItem>
+                                      <SelectItem value="admin">Admin</SelectItem>
+                                      <SelectItem value="super_admin">Super Admin</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                ) : (
+                                  getRoleBadge(admin.role)
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                {admin.is_approved ? (
+                                  <Badge className="bg-green-100 text-green-800">Approved</Badge>
+                                ) : (
+                                  <Badge className="bg-yellow-100 text-yellow-800">Pending</Badge>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                {new Date(admin.created_at).toLocaleDateString()}
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex gap-2">
+                                  {!admin.is_approved && currentUser?.permissions.admins.edit && (
+                                    <>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => handleApproveAdmin(admin.id)}
+                                        disabled={updating}
+                                      >
+                                        <Check className="w-4 h-4 text-green-600" />
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => handleRejectAdmin(admin.id)}
+                                        disabled={updating}
+                                      >
+                                        <X className="w-4 h-4 text-red-600" />
+                                      </Button>
+                                    </>
+                                  )}
+                                  {admin.is_approved && (
+                                    <>
+                                      {currentUser?.permissions.admins.edit && (
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={() => handleEditPermissions(admin)}
+                                        >
+                                          <Settings className="w-4 h-4" />
+                                        </Button>
+                                      )}
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => handleChangePassword(admin)}
+                                      >
+                                        <Key className="w-4 h-4" />
+                                      </Button>
+                                      {currentUser?.permissions.admins.edit && admin.id !== currentUser?.id && (
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={() => handleDeleteAdmin(admin.id)}
+                                          disabled={updating}
+                                        >
+                                          <Trash2 className="w-4 h-4" />
+                                        </Button>
+                                      )}
+                                    </>
+                                  )}
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            )}
+
+            {currentUser?.permissions.settings.view && (
+              <TabsContent value="settings" className="space-y-6">
+                <Tabs defaultValue="agencies">
+                  <TabsList>
+                    <TabsTrigger value="agencies">Agencies</TabsTrigger>
+                    <TabsTrigger value="email">Email Recipients</TabsTrigger>
+                    <TabsTrigger value="options">Form Options</TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="agencies">
+                    <Card>
+                      <CardHeader>
+                        <div className="flex justify-between items-center">
+                          <CardTitle>Agencies</CardTitle>
+                          {currentUser?.permissions.settings.edit && (
+                            <Button onClick={handleCreateAgency}>
+                              <Plus className="w-4 h-4 mr-2" />
+                              Add Agency
+                            </Button>
+                          )}
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        {agencies.length === 0 ? (
+                          <p className="text-center py-8 text-gray-500">
+                            No agencies yet
+                          </p>
+                        ) : (
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Name</TableHead>
+                                <TableHead>Contact Person</TableHead>
+                                <TableHead>Email</TableHead>
+                                <TableHead>Phone</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead>Actions</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {agencies.map((agency) => (
+                                <TableRow key={agency.id}>
+                                  <TableCell className="font-medium">{agency.name}</TableCell>
+                                  <TableCell>{agency.contact_person || 'N/A'}</TableCell>
+                                  <TableCell>{agency.email || 'N/A'}</TableCell>
+                                  <TableCell>{agency.phone || 'N/A'}</TableCell>
+                                  <TableCell>
+                                    <Switch
+                                      checked={agency.is_active}
+                                      onCheckedChange={(checked) => handleToggleAgencyActive(agency.id, checked)}
+                                      disabled={!currentUser?.permissions.settings.edit}
+                                    />
+                                  </TableCell>
+                                  <TableCell>
+                                    <div className="flex gap-2">
+                                      {currentUser?.permissions.settings.edit && (
+                                        <>
+                                          <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() => handleEditAgency(agency)}
+                                          >
+                                            <Edit className="w-4 h-4" />
+                                          </Button>
+                                          <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() => handleDeleteAgency(agency.id)}
+                                            disabled={updating}
+                                          >
+                                            <Trash2 className="w-4 h-4" />
+                                          </Button>
+                                        </>
+                                      )}
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+
+                  <TabsContent value="email">
+                    <Card>
+                      <CardHeader>
+                        <div className="flex justify-between items-center">
+                          <CardTitle>Email Recipients</CardTitle>
+                          {currentUser?.permissions.settings.edit && (
+                            <Button onClick={handleCreateEmailRecipient}>
+                              <Plus className="w-4 h-4 mr-2" />
+                              Add Recipient
+                            </Button>
+                          )}
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        {emailRecipients.length === 0 ? (
+                          <p className="text-center py-8 text-gray-500">
+                            No email recipients yet
+                          </p>
+                        ) : (
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Name</TableHead>
+                                <TableHead>Email</TableHead>
+                                <TableHead>Nationality</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead>Actions</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {emailRecipients.map((recipient) => (
+                                <TableRow key={recipient.id}>
+                                  <TableCell className="font-medium">{recipient.name}</TableCell>
+                                  <TableCell>{recipient.email}</TableCell>
+                                  <TableCell>{recipient.nationality || 'All'}</TableCell>
+                                  <TableCell>
+                                    <Switch
+                                      checked={recipient.is_active}
+                                      onCheckedChange={(checked) => handleToggleEmailRecipientActive(recipient.id, checked)}
+                                      disabled={!currentUser?.permissions.settings.edit}
+                                    />
+                                  </TableCell>
+                                  <TableCell>
+                                    <div className="flex gap-2">
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => handleViewEmailRecipient(recipient)}
+                                      >
+                                        <Eye className="w-4 h-4" />
+                                      </Button>
+                                      {currentUser?.permissions.settings.edit && (
+                                        <>
+                                          <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() => handleEditEmailRecipient(recipient)}
+                                          >
+                                            <Edit className="w-4 h-4" />
+                                          </Button>
+                                          <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() => handleDeleteEmailRecipient(recipient.id)}
+                                            disabled={updating}
+                                          >
+                                            <Trash2 className="w-4 h-4" />
+                                          </Button>
+                                        </>
+                                      )}
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+
+                  <TabsContent value="options">
+                    <div className="grid gap-6">
+                      <Card>
+                        <CardHeader>
+                          <CardTitle>Positions</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          {currentUser?.permissions.settings.edit && (
+                            <form onSubmit={handleAddPosition} className="flex gap-2 mb-4">
+                              <Input
+                                value={newPositionName}
+                                onChange={(e) => setNewPositionName(e.target.value)}
+                                placeholder="Add new position"
+                              />
+                              <Button type="submit" disabled={updating}>
+                                <Plus className="w-4 h-4" />
+                              </Button>
+                            </form>
+                          )}
+                          <div className="flex flex-wrap gap-2">
+                            {positionOptions.map((pos) => (
+                              <Badge key={pos.id} variant="outline" className="text-sm py-1 px-3">
+                                {pos.name}
+                                {currentUser?.permissions.settings.edit && (
+                                  <button
+                                    onClick={() => handleDeletePosition(pos.id)}
+                                    className="ml-2 text-red-500 hover:text-red-700"
+                                  >
+                                    ×
+                                  </button>
+                                )}
+                              </Badge>
+                            ))}
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      <Card>
+                        <CardHeader>
+                          <CardTitle>Vessel Types</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          {currentUser?.permissions.settings.edit && (
+                            <form onSubmit={handleAddVesselType} className="flex gap-2 mb-4">
+                              <Input
+                                value={newVesselTypeName}
+                                onChange={(e) => setNewVesselTypeName(e.target.value)}
+                                placeholder="Add new vessel type"
+                              />
+                              <Button type="submit" disabled={updating}>
+                                <Plus className="w-4 h-4" />
+                              </Button>
+                            </form>
+                          )}
+                          <div className="flex flex-wrap gap-2">
+                            {vesselTypeOptions.map((vt) => (
+                              <Badge key={vt.id} variant="outline" className="text-sm py-1 px-3">
+                                {vt.name}
+                                {currentUser?.permissions.settings.edit && (
+                                  <button
+                                    onClick={() => handleDeleteVesselType(vt.id)}
+                                    className="ml-2 text-red-500 hover:text-red-700"
+                                  >
+                                    ×
+                                  </button>
+                                )}
+                              </Badge>
+                            ))}
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      <Card>
+                        <CardHeader>
+                          <CardTitle>Locations</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          {currentUser?.permissions.settings.edit && (
+                            <form onSubmit={handleAddLocation} className="flex gap-2 mb-4">
+                              <Input
+                                value={newLocationName}
+                                onChange={(e) => setNewLocationName(e.target.value)}
+                                placeholder="Add new location"
+                              />
+                              <Button type="submit" disabled={updating}>
+                                <Plus className="w-4 h-4" />
+                              </Button>
+                            </form>
+                          )}
+                          <div className="flex flex-wrap gap-2">
+                            {locationOptions.map((loc) => (
+                              <Badge key={loc.id} variant="outline" className="text-sm py-1 px-3">
+                                {loc.name}
+                                {currentUser?.permissions.settings.edit && (
+                                  <button
+                                    onClick={() => handleDeleteLocation(loc.id)}
+                                    className="ml-2 text-red-500 hover:text-red-700"
+                                  >
+                                    ×
+                                  </button>
+                                )}
+                              </Badge>
+                            ))}
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      <Card>
+                        <CardHeader>
+                          <CardTitle>Salary Ranges</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          {currentUser?.permissions.settings.edit && (
+                            <form onSubmit={handleAddSalaryRange} className="flex gap-2 mb-4">
+                              <Input
+                                value={newSalaryRangeName}
+                                onChange={(e) => setNewSalaryRangeName(e.target.value)}
+                                placeholder="Add new salary range"
+                              />
+                              <Button type="submit" disabled={updating}>
+                                <Plus className="w-4 h-4" />
+                              </Button>
+                            </form>
+                          )}
+                          <div className="flex flex-wrap gap-2">
+                            {salaryRangeOptions.map((sr) => (
+                              <Badge key={sr.id} variant="outline" className="text-sm py-1 px-3">
+                                {sr.name}
+                                {currentUser?.permissions.settings.edit && (
+                                  <button
+                                    onClick={() => handleDeleteSalaryRange(sr.id)}
+                                    className="ml-2 text-red-500 hover:text-red-700"
+                                  >
+                                    ×
+                                  </button>
+                                )}
+                              </Badge>
+                            ))}
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      <Card>
+                        <CardHeader>
+                          <CardTitle>Nationalities</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          {currentUser?.permissions.settings.edit && (
+                            <form onSubmit={handleAddNationality} className="flex gap-2 mb-4">
+                              <Input
+                                value={newNationalityName}
+                                onChange={(e) => setNewNationalityName(e.target.value)}
+                                placeholder="Add new nationality"
+                              />
+                              <Button type="submit" disabled={updating}>
+                                <Plus className="w-4 h-4" />
+                              </Button>
+                            </form>
+                          )}
+                          <div className="flex flex-wrap gap-2">
+                            {nationalityOptions.map((nat) => (
+                              <Badge key={nat.id} variant="outline" className="text-sm py-1 px-3">
+                                {nat.name}
+                                {currentUser?.permissions.settings.edit && (
+                                  <button
+                                    onClick={() => handleDeleteNationality(nat.id)}
+                                    className="ml-2 text-red-500 hover:text-red-700"
+                                  >
+                                    ×
+                                  </button>
+                                )}
+                              </Badge>
+                            ))}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
+                  </TabsContent>
+                </Tabs>
+              </TabsContent>
+            )}
           </Tabs>
         </div>
       </div>
+
+      {/* Application Detail Modal */}
+      {selectedApplication && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <Card className="max-w-3xl w-full my-8">
+            <CardHeader>
+              <div className="flex justify-between items-start">
+                <div>
+                  <CardTitle className="text-2xl">{selectedApplication.full_name}</CardTitle>
+                  <CardDescription>{selectedApplication.job_title}</CardDescription>
+                </div>
+                <Button
+                  variant="ghost"
+                  onClick={() => setSelectedApplication(null)}
+                >
+                  ✕
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-sm text-gray-500">Email</Label>
+                  <p className="flex items-center gap-2">
+                    <Mail className="w-4 h-4" />
+                    {selectedApplication.email}
+                  </p>
+                </div>
+                <div>
+                  <Label className="text-sm text-gray-500">Phone</Label>
+                  <p className="flex items-center gap-2">
+                    <Phone className="w-4 h-4" />
+                    {selectedApplication.phone}
+                  </p>
+                </div>
+                <div>
+                  <Label className="text-sm text-gray-500">Date of Birth</Label>
+                  <p className="flex items-center gap-2">
+                    <Calendar className="w-4 h-4" />
+                    {selectedApplication.date_of_birth ? new Date(selectedApplication.date_of_birth).toLocaleDateString() : 'N/A'}
+                  </p>
+                </div>
+                <div>
+                  <Label className="text-sm text-gray-500">Nationality</Label>
+                  <p>{selectedApplication.nationality}</p>
+                </div>
+                <div>
+                  <Label className="text-sm text-gray-500">Experience</Label>
+                  <p>{selectedApplication.experience_years} years</p>
+                </div>
+                <div>
+                  <Label className="text-sm text-gray-500">Expected Salary</Label>
+                  <p className="flex items-center gap-2">
+                    <DollarSign className="w-4 h-4" />
+                    {formatSalary(selectedApplication.expected_salary)}
+                  </p>
+                </div>
+                <div>
+                  <Label className="text-sm text-gray-500">Agency</Label>
+                  <p className="flex items-center gap-2">
+                    <Building2 className="w-4 h-4" />
+                    {selectedApplication.agency_id ? agencies.find(a => a.id === selectedApplication.agency_id)?.name || 'N/A' : 'Direct Application'}
+                  </p>
+                </div>
+                <div>
+                  <Label className="text-sm text-gray-500">Submitted</Label>
+                  <p>{new Date(selectedApplication.submitted_date).toLocaleString()}</p>
+                </div>
+              </div>
+
+              {selectedApplication.certificates && (
+                <div>
+                  <Label className="text-sm text-gray-500 mb-2 block">Certificates</Label>
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <p className="whitespace-pre-wrap">{selectedApplication.certificates}</p>
+                  </div>
+                </div>
+              )}
+
+              {selectedApplication.previous_vessels && (
+                <div>
+                  <Label className="text-sm text-gray-500 mb-2 block">Previous Vessels</Label>
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <p className="whitespace-pre-wrap">{selectedApplication.previous_vessels}</p>
+                  </div>
+                </div>
+              )}
+
+              {selectedApplication.cover_letter && (
+                <div>
+                  <Label className="text-sm text-gray-500 mb-2 block">Cover Letter</Label>
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <p className="whitespace-pre-wrap">{selectedApplication.cover_letter}</p>
+                  </div>
+                </div>
+              )}
+
+              {selectedApplication.resume_url && (
+                <div>
+                  <Label className="text-sm text-gray-500 mb-2 block">Resume</Label>
+                  <Button
+                    variant="outline"
+                    onClick={() => handleDownloadResume(selectedApplication)}
+                    disabled={downloadingResume}
+                  >
+                    {downloadingResume ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Downloading...
+                      </>
+                    ) : (
+                      <>
+                        <Download className="w-4 h-4 mr-2" />
+                        Download Resume
+                      </>
+                    )}
+                  </Button>
+                </div>
+              )}
+
+              {currentUser?.permissions.applications.edit && (
+                <div>
+                  <Label className="text-sm text-gray-500 mb-2 block">Update Status</Label>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant={selectedApplication.status === 'pending' ? 'default' : 'outline'}
+                      onClick={() => updateApplicationStatus(selectedApplication.id, 'pending')}
+                      disabled={updating}
+                    >
+                      Pending
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={selectedApplication.status === 'reviewed' ? 'default' : 'outline'}
+                      onClick={() => updateApplicationStatus(selectedApplication.id, 'reviewed')}
+                      disabled={updating}
+                    >
+                      Reviewed
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={selectedApplication.status === 'shortlisted' ? 'default' : 'outline'}
+                      onClick={() => updateApplicationStatus(selectedApplication.id, 'shortlisted')}
+                      disabled={updating}
+                    >
+                      Shortlisted
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={selectedApplication.status === 'rejected' ? 'default' : 'outline'}
+                      onClick={() => updateApplicationStatus(selectedApplication.id, 'rejected')}
+                      disabled={updating}
+                    >
+                      Rejected
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Email Recipient Detail Modal */}
+      {showEmailRecipientDetail && selectedEmailRecipient && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <Card className="max-w-md w-full">
+            <CardHeader>
+              <div className="flex justify-between items-start">
+                <CardTitle className="text-2xl">Email Recipient Details</CardTitle>
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setShowEmailRecipientDetail(false);
+                    setSelectedEmailRecipient(null);
+                  }}
+                >
+                  ✕
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label className="text-sm text-gray-500">Name</Label>
+                <p className="font-medium">{selectedEmailRecipient.name}</p>
+              </div>
+              <div>
+                <Label className="text-sm text-gray-500">Email</Label>
+                <p className="flex items-center gap-2">
+                  <Mail className="w-4 h-4" />
+                  {selectedEmailRecipient.email}
+                </p>
+              </div>
+              <div>
+                <Label className="text-sm text-gray-500">Nationality Filter</Label>
+                <p>{selectedEmailRecipient.nationality || 'All nationalities'}</p>
+              </div>
+              <div>
+                <Label className="text-sm text-gray-500">Status</Label>
+                <p>
+                  {selectedEmailRecipient.is_active ? (
+                    <Badge className="bg-green-100 text-green-800">Active</Badge>
+                  ) : (
+                    <Badge className="bg-gray-100 text-gray-800">Inactive</Badge>
+                  )}
+                </p>
+              </div>
+              <div>
+                <Label className="text-sm text-gray-500">Created</Label>
+                <p>{new Date(selectedEmailRecipient.created_at).toLocaleString()}</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Job Form Modal */}
+      {showJobForm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <Card className="max-w-2xl w-full my-8">
+            <CardHeader>
+              <div className="flex justify-between items-start">
+                <CardTitle className="text-2xl">
+                  {selectedJob ? 'Edit Job Posting' : 'Create Job Posting'}
+                </CardTitle>
+                <Button
+                  variant="ghost"
+                  onClick={resetJobForm}
+                >
+                  ✕
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSaveJob} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="job_title">Job Title *</Label>
+                  <Input
+                    id="job_title"
+                    value={jobFormData.title}
+                    onChange={(e) => handleJobFormChange('title', e.target.value)}
+                    placeholder="e.g., Chief Engineer"
+                    required
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="job_position">Position *</Label>
+                    <Select
+                      value={jobFormData.position}
+                      onValueChange={(value) => handleJobFormChange('position', value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select position" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {positionOptions.map((pos) => (
+                          <SelectItem key={pos.id} value={pos.name}>
+                            {pos.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="job_vessel_type">Vessel Type *</Label>
+                    <Select
+                      value={jobFormData.vessel_type}
+                      onValueChange={(value) => handleJobFormChange('vessel_type', value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select vessel type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {vesselTypeOptions.map((vt) => (
+                          <SelectItem key={vt.id} value={vt.name}>
+                            {vt.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="job_location">Location</Label>
+                    <Select
+                      value={jobFormData.location}
+                      onValueChange={(value) => handleJobFormChange('location', value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select location" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {locationOptions.map((loc) => (
+                          <SelectItem key={loc.id} value={loc.name}>
+                            {loc.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="job_salary_range">Salary Range</Label>
+                    <Select
+                      value={jobFormData.salary_range}
+                      onValueChange={(value) => handleJobFormChange('salary_range', value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select salary range" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {salaryRangeOptions.map((sr) => (
+                          <SelectItem key={sr.id} value={sr.name}>
+                            {sr.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="job_requirements">Requirements (one per line)</Label>
+                  <Textarea
+                    id="job_requirements"
+                    value={jobFormData.requirements}
+                    onChange={(e) => handleJobFormChange('requirements', e.target.value)}
+                    placeholder="Enter requirements, one per line"
+                    rows={5}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="job_responsibilities">Responsibilities (one per line)</Label>
+                  <Textarea
+                    id="job_responsibilities"
+                    value={jobFormData.responsibilities}
+                    onChange={(e) => handleJobFormChange('responsibilities', e.target.value)}
+                    placeholder="Enter responsibilities, one per line"
+                    rows={5}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="job_status">Status</Label>
+                  <Select
+                    value={jobFormData.status}
+                    onValueChange={(value) => handleJobFormChange('status', value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="closed">Closed</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex gap-2 pt-4">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={resetJobForm}
+                    className="flex-1"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    className="flex-1 bg-blue-600 hover:bg-blue-700"
+                    disabled={updating}
+                  >
+                    {updating ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      'Save Job'
+                    )}
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Password Change Modal */}
+      {showPasswordForm && selectedAdmin && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <Card className="max-w-md w-full">
+            <CardHeader>
+              <div className="flex justify-between items-start">
+                <CardTitle className="text-2xl">Change Password</CardTitle>
+                <Button
+                  variant="ghost"
+                  onClick={() => setShowPasswordForm(false)}
+                >
+                  ✕
+                </Button>
+              </div>
+              <CardDescription>
+                Changing password for: {selectedAdmin.username}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSavePassword} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="new_password">New Password *</Label>
+                  <Input
+                    id="new_password"
+                    type="password"
+                    value={passwordFormData.newPassword}
+                    onChange={(e) => setPasswordFormData({ ...passwordFormData, newPassword: e.target.value })}
+                    placeholder="Enter new password (min 6 characters)"
+                    required
+                    disabled={updating}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="confirm_new_password">Confirm Password *</Label>
+                  <Input
+                    id="confirm_new_password"
+                    type="password"
+                    value={passwordFormData.confirmPassword}
+                    onChange={(e) => setPasswordFormData({ ...passwordFormData, confirmPassword: e.target.value })}
+                    placeholder="Confirm new password"
+                    required
+                    disabled={updating}
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setShowPasswordForm(false)}
+                    className="flex-1"
+                    disabled={updating}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    className="flex-1 bg-blue-600 hover:bg-blue-700"
+                    disabled={updating}
+                  >
+                    {updating ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Updating...
+                      </>
+                    ) : (
+                      'Update Password'
+                    )}
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Permissions Edit Modal */}
+      {showPermissionsForm && selectedAdmin && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <Card className="max-w-2xl w-full my-8">
+            <CardHeader>
+              <div className="flex justify-between items-start">
+                <CardTitle className="text-2xl">Edit Permissions</CardTitle>
+                <Button
+                  variant="ghost"
+                  onClick={() => setShowPermissionsForm(false)}
+                >
+                  ✕
+                </Button>
+              </div>
+              <CardDescription>
+                Managing permissions for: {selectedAdmin.username}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                {/* Applications Permissions */}
+                <div className="border rounded-lg p-4">
+                  <h3 className="font-semibold mb-3">Applications</h3>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="app_view">View Applications</Label>
+                      <Switch
+                        id="app_view"
+                        checked={selectedAdmin.permissions.applications.view}
+                        onCheckedChange={(checked) => handleUpdatePermissions(selectedAdmin.id, 'applications', 'view', checked)}
+                        disabled={updating}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="app_edit">Edit Applications</Label>
+                      <Switch
+                        id="app_edit"
+                        checked={selectedAdmin.permissions.applications.edit}
+                        onCheckedChange={(checked) => handleUpdatePermissions(selectedAdmin.id, 'applications', 'edit', checked)}
+                        disabled={updating}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="app_delete">Delete Applications</Label>
+                      <Switch
+                        id="app_delete"
+                        checked={selectedAdmin.permissions.applications.delete}
+                        onCheckedChange={(checked) => handleUpdatePermissions(selectedAdmin.id, 'applications', 'delete', checked)}
+                        disabled={updating}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Jobs Permissions */}
+                <div className="border rounded-lg p-4">
+                  <h3 className="font-semibold mb-3">Job Postings</h3>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="jobs_view">View Jobs</Label>
+                      <Switch
+                        id="jobs_view"
+                        checked={selectedAdmin.permissions.jobs.view}
+                        onCheckedChange={(checked) => handleUpdatePermissions(selectedAdmin.id, 'jobs', 'view', checked)}
+                        disabled={updating}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="jobs_edit">Edit Jobs</Label>
+                      <Switch
+                        id="jobs_edit"
+                        checked={selectedAdmin.permissions.jobs.edit}
+                        onCheckedChange={(checked) => handleUpdatePermissions(selectedAdmin.id, 'jobs', 'edit', checked)}
+                        disabled={updating}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="jobs_delete">Delete Jobs</Label>
+                      <Switch
+                        id="jobs_delete"
+                        checked={selectedAdmin.permissions.jobs.delete}
+                        onCheckedChange={(checked) => handleUpdatePermissions(selectedAdmin.id, 'jobs', 'delete', checked)}
+                        disabled={updating}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Admins Permissions */}
+                <div className="border rounded-lg p-4">
+                  <h3 className="font-semibold mb-3">Admin Users</h3>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="admins_view">View Admins</Label>
+                      <Switch
+                        id="admins_view"
+                        checked={selectedAdmin.permissions.admins.view}
+                        onCheckedChange={(checked) => handleUpdatePermissions(selectedAdmin.id, 'admins', 'view', checked)}
+                        disabled={updating}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="admins_edit">Edit Admins</Label>
+                      <Switch
+                        id="admins_edit"
+                        checked={selectedAdmin.permissions.admins.edit}
+                        onCheckedChange={(checked) => handleUpdatePermissions(selectedAdmin.id, 'admins', 'edit', checked)}
+                        disabled={updating}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Settings Permissions */}
+                <div className="border rounded-lg p-4">
+                  <h3 className="font-semibold mb-3">Settings</h3>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="settings_view">View Settings</Label>
+                      <Switch
+                        id="settings_view"
+                        checked={selectedAdmin.permissions.settings.view}
+                        onCheckedChange={(checked) => handleUpdatePermissions(selectedAdmin.id, 'settings', 'view', checked)}
+                        disabled={updating}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="settings_edit">Edit Settings</Label>
+                      <Switch
+                        id="settings_edit"
+                        checked={selectedAdmin.permissions.settings.edit}
+                        onCheckedChange={(checked) => handleUpdatePermissions(selectedAdmin.id, 'settings', 'edit', checked)}
+                        disabled={updating}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex justify-end">
+                  <Button
+                    onClick={() => setShowPermissionsForm(false)}
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    Done
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Agency Form Modal */}
+      {showAgencyForm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <Card className="max-w-md w-full">
+            <CardHeader>
+              <div className="flex justify-between items-start">
+                <CardTitle className="text-2xl">
+                  {selectedAgency ? 'Edit Agency' : 'Add Agency'}
+                </CardTitle>
+                <Button
+                  variant="ghost"
+                  onClick={() => setShowAgencyForm(false)}
+                >
+                  ✕
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSaveAgency} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="agency_name">Agency Name *</Label>
+                  <Input
+                    id="agency_name"
+                    value={agencyFormData.name}
+                    onChange={(e) => setAgencyFormData({ ...agencyFormData, name: e.target.value })}
+                    placeholder="Enter agency name"
+                    required
+                    disabled={updating}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="agency_contact">Contact Person</Label>
+                  <Input
+                    id="agency_contact"
+                    value={agencyFormData.contact_person}
+                    onChange={(e) => setAgencyFormData({ ...agencyFormData, contact_person: e.target.value })}
+                    placeholder="Enter contact person name"
+                    disabled={updating}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="agency_email">Email</Label>
+                  <Input
+                    id="agency_email"
+                    type="email"
+                    value={agencyFormData.email}
+                    onChange={(e) => setAgencyFormData({ ...agencyFormData, email: e.target.value })}
+                    placeholder="Enter email"
+                    disabled={updating}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="agency_phone">Phone</Label>
+                  <Input
+                    id="agency_phone"
+                    value={agencyFormData.phone}
+                    onChange={(e) => setAgencyFormData({ ...agencyFormData, phone: e.target.value })}
+                    placeholder="Enter phone number"
+                    disabled={updating}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="agency_address">Address</Label>
+                  <Textarea
+                    id="agency_address"
+                    value={agencyFormData.address}
+                    onChange={(e) => setAgencyFormData({ ...agencyFormData, address: e.target.value })}
+                    placeholder="Enter address"
+                    rows={3}
+                    disabled={updating}
+                  />
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="agency_active"
+                    checked={agencyFormData.is_active}
+                    onCheckedChange={(checked) => setAgencyFormData({ ...agencyFormData, is_active: checked })}
+                    disabled={updating}
+                  />
+                  <Label htmlFor="agency_active">Active</Label>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setShowAgencyForm(false)}
+                    className="flex-1"
+                    disabled={updating}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    className="flex-1 bg-blue-600 hover:bg-blue-700"
+                    disabled={updating}
+                  >
+                    {updating ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      'Save Agency'
+                    )}
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Email Recipient Form Modal */}
+      {showEmailRecipientForm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <Card className="max-w-md w-full">
+            <CardHeader>
+              <div className="flex justify-between items-start">
+                <CardTitle className="text-2xl">
+                  {selectedEmailRecipient ? 'Edit Email Recipient' : 'Add Email Recipient'}
+                </CardTitle>
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setShowEmailRecipientForm(false);
+                    setSelectedEmailRecipient(null);
+                  }}
+                >
+                  ✕
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSaveEmailRecipient} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="recipient_name">Name *</Label>
+                  <Input
+                    id="recipient_name"
+                    value={emailRecipientFormData.name}
+                    onChange={(e) => setEmailRecipientFormData({ ...emailRecipientFormData, name: e.target.value })}
+                    placeholder="Enter recipient name"
+                    required
+                    disabled={updating}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="recipient_email">Email *</Label>
+                  <Input
+                    id="recipient_email"
+                    type="email"
+                    value={emailRecipientFormData.email}
+                    onChange={(e) => setEmailRecipientFormData({ ...emailRecipientFormData, email: e.target.value })}
+                    placeholder="Enter email address"
+                    required
+                    disabled={updating}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="recipient_nationality">Nationality Filter (optional)</Label>
+                  <Select
+                    value={emailRecipientFormData.nationality}
+                    onValueChange={(value) => setEmailRecipientFormData({ ...emailRecipientFormData, nationality: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="All nationalities" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All nationalities</SelectItem>
+                      {nationalityOptions.map((nat) => (
+                        <SelectItem key={nat.id} value={nat.name}>
+                          {nat.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-sm text-gray-500">
+                    Leave empty to receive all applications, or select a nationality to only receive applications from that nationality
+                  </p>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="recipient_active"
+                    checked={emailRecipientFormData.is_active}
+                    onCheckedChange={(checked) => setEmailRecipientFormData({ ...emailRecipientFormData, is_active: checked })}
+                    disabled={updating}
+                  />
+                  <Label htmlFor="recipient_active">Active</Label>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setShowEmailRecipientForm(false);
+                      setSelectedEmailRecipient(null);
+                    }}
+                    className="flex-1"
+                    disabled={updating}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    className="flex-1 bg-blue-600 hover:bg-blue-700"
+                    disabled={updating}
+                  >
+                    {updating ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      'Save Recipient'
+                    )}
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Admin Form Modal (for creating new admin when logged in) */}
+      {showAdminForm && isAuthenticated && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <Card className="max-w-md w-full">
+            <CardHeader>
+              <div className="flex justify-between items-start">
+                <CardTitle className="text-2xl">Create Admin User</CardTitle>
+                <Button
+                  variant="ghost"
+                  onClick={() => setShowAdminForm(false)}
+                >
+                  ✕
+                </Button>
+              </div>
+              <CardDescription>
+                Create a new admin user (requires approval)
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSaveAdmin} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="admin_username">Username *</Label>
+                  <Input
+                    id="admin_username"
+                    value={adminFormData.username}
+                    onChange={(e) => setAdminFormData({ ...adminFormData, username: e.target.value })}
+                    placeholder="Enter username"
+                    required
+                    disabled={updating}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="admin_password">Password *</Label>
+                  <Input
+                    id="admin_password"
+                    type="password"
+                    value={adminFormData.password}
+                    onChange={(e) => setAdminFormData({ ...adminFormData, password: e.target.value })}
+                    placeholder="Enter password (min 6 characters)"
+                    required
+                    disabled={updating}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="admin_confirm_password">Confirm Password *</Label>
+                  <Input
+                    id="admin_confirm_password"
+                    type="password"
+                    value={adminFormData.confirmPassword}
+                    onChange={(e) => setAdminFormData({ ...adminFormData, confirmPassword: e.target.value })}
+                    placeholder="Confirm password"
+                    required
+                    disabled={updating}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="admin_role">Role</Label>
+                  <Select
+                    value={adminFormData.role}
+                    onValueChange={(value) => setAdminFormData({ ...adminFormData, role: value as AdminUser['role'] })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="viewer">Viewer</SelectItem>
+                      <SelectItem value="admin">Admin</SelectItem>
+                      <SelectItem value="super_admin">Super Admin</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setShowAdminForm(false)}
+                    className="flex-1"
+                    disabled={updating}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    className="flex-1 bg-blue-600 hover:bg-blue-700"
+                    disabled={updating}
+                  >
+                    {updating ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Creating...
+                      </>
+                    ) : (
+                      'Create Admin'
+                    )}
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }
