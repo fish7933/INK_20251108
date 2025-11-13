@@ -281,11 +281,15 @@ export const applicationsAPI = {
       }
     }
 
-    // Automatically send email notification after application is created
+    // Send emails after application is created
     try {
+      // Send email to admins
       await sendApplicationEmail(data.id);
+      
+      // Send confirmation email to applicant
+      await sendConfirmationEmail(data.id);
     } catch (emailError) {
-      console.error('Error sending application email:', emailError);
+      console.error('Error sending emails:', emailError);
       // Don't throw error here - application was created successfully
       // Email sending failure shouldn't prevent application submission
     }
@@ -1040,7 +1044,7 @@ export const storageAPI = {
   }
 };
 
-// Send Application Email
+// Send Application Email (to admins)
 export async function sendApplicationEmail(applicationId: string): Promise<void> {
   const { data, error } = await supabase.functions.invoke('app_7c39e793e3_send_application_email', {
     body: { applicationId }
@@ -1048,4 +1052,23 @@ export async function sendApplicationEmail(applicationId: string): Promise<void>
 
   if (error) throw error;
   return data;
+}
+
+// Send Confirmation Email (to applicant)
+export async function sendConfirmationEmail(applicationId: string): Promise<void> {
+  try {
+    const { data, error } = await supabase.functions.invoke('app_7c39e793e3_send_confirmation_email', {
+      body: { applicationId }
+    });
+
+    if (error) {
+      console.error('Error sending confirmation email:', error);
+      throw error;
+    }
+    
+    return data;
+  } catch (error) {
+    console.error('Failed to send confirmation email:', error);
+    // Don't throw - this is a non-critical feature
+  }
 }
