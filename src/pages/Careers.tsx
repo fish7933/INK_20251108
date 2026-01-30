@@ -15,8 +15,6 @@ interface PositionWithVessel extends Position {
 }
 
 export default function Careers() {
-  console.log('🎯 Careers component mounted');
-
   const [positions, setPositions] = useState<PositionWithVessel[]>([]);
   const [filteredPositions, setFilteredPositions] = useState<PositionWithVessel[]>([]);
   const [selectedPosition, setSelectedPosition] = useState<PositionWithVessel | null>(null);
@@ -61,52 +59,35 @@ export default function Careers() {
     try {
       setLoading(true);
       setError(null);
-      console.log('🔍 Starting to load positions...');
-      console.log('🔍 Supabase URL:', supabase.supabaseUrl);
       
-      // Direct query with detailed error handling
       const { data, error: queryError } = await supabase
         .from('app_7c39e793e3_positions')
         .select('*, vessel:app_7c39e793e3_vessels(*)')
+        .eq('is_active', true)
         .order('created_at', { ascending: false });
       
-      console.log('📦 Query result:', { data, error: queryError });
-      
       if (queryError) {
-        console.error('❌ Query error:', queryError);
-        throw new Error(`Database error: ${queryError.message} (Code: ${queryError.code})`);
+        throw queryError;
       }
       
       if (!data) {
-        console.warn('⚠️ No data returned from query');
         setPositions([]);
         setFilteredPositions([]);
         return;
       }
       
-      console.log('📦 Fetched positions:', data.length);
-      console.log('📦 First position:', data[0]);
-      
-      // Filter only active positions with active vessels
-      const activePositions = data.filter((p: PositionWithVessel) => {
-        const isActive = p.is_active && p.vessel?.is_active;
-        console.log(`Position "${p.position_name}": is_active=${p.is_active}, vessel.is_active=${p.vessel?.is_active}, included=${isActive}`);
-        return isActive;
-      });
-      
-      console.log('✅ Active positions:', activePositions.length);
+      // Filter only positions with active vessels
+      const activePositions = data.filter((p: PositionWithVessel) => p.vessel?.is_active === true);
       
       setPositions(activePositions);
       setFilteredPositions(activePositions);
     } catch (err) {
-      console.error('❌ Failed to load positions:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
-      console.error('❌ Error details:', errorMessage);
+      console.error('Failed to load positions:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load job positions';
       setError(errorMessage);
-      toast.error(`Failed to load positions: ${errorMessage}`);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
-      console.log('✅ Loading complete');
     }
   };
 
@@ -231,15 +212,12 @@ export default function Careers() {
     }
   };
 
-  console.log('🎨 Render - loading:', loading, 'error:', error, 'positions:', positions.length, 'filtered:', filteredPositions.length);
-
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
         <div className="text-center">
           <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-red-600 mx-auto mb-4"></div>
           <p className="text-gray-600 text-lg font-medium">Loading opportunities...</p>
-          <p className="text-xs text-gray-400 mt-2">This should only take a moment</p>
         </div>
       </div>
     );
@@ -253,21 +231,10 @@ export default function Careers() {
             <div className="text-center">
               <AlertCircle className="h-16 w-16 text-red-600 mx-auto mb-4" />
               <h2 className="text-2xl font-bold text-gray-900 mb-2">Failed to Load Job Postings</h2>
-              <p className="text-gray-600 mb-4">We encountered an error while loading the job positions:</p>
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-                <p className="text-sm text-red-800 font-mono break-words">{error}</p>
-              </div>
-              <div className="space-y-3">
-                <Button 
-                  onClick={loadPositions} 
-                  className="bg-red-600 hover:bg-red-700 w-full sm:w-auto"
-                >
-                  Try Again
-                </Button>
-                <p className="text-xs text-gray-500">
-                  If this problem persists, please contact the administrator.
-                </p>
-              </div>
+              <p className="text-gray-600 mb-4">{error}</p>
+              <Button onClick={loadPositions} className="bg-red-600 hover:bg-red-700">
+                Try Again
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -387,19 +354,34 @@ export default function Careers() {
                 className="hover:shadow-2xl transition-all duration-300 border-2 border-gray-100 hover:border-blue-200"
               >
                 <CardContent className="p-6">
+                  {/* Vessel Name - 최상단에 크고 눈에 띄게 배치 */}
+                  {position.vessel?.vessel_name && (
+                    <div className="mb-4 pb-4 border-b-2 border-blue-100">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Ship className="h-5 w-5 text-blue-600 flex-shrink-0" />
+                        <span className="text-xs font-semibold text-blue-600 uppercase tracking-wider">Vessel</span>
+                      </div>
+                      <h2 className="text-2xl font-bold text-blue-700 leading-tight">
+                        {position.vessel.vessel_name}
+                      </h2>
+                    </div>
+                  )}
+
                   {/* Position Header */}
                   <div className="mb-4">
-                    <h3 className="text-2xl font-bold text-gray-900 mb-2">{position.position_name}</h3>
-                    <p className="text-sm text-gray-600 mb-3">
-                      {new Date(position.created_at).toLocaleDateString('en-US', {
-                        month: 'long',
-                        day: 'numeric',
-                        year: 'numeric',
-                      })}
-                    </p>
-                    <Badge variant="outline" className="mb-3 bg-blue-50 text-blue-700 border-blue-200">
-                      {position.vessel?.vessel_type || 'Vessel'}
-                    </Badge>
+                    <h3 className="text-xl font-bold text-gray-900 mb-2">{position.position_name}</h3>
+                    <div className="flex items-center gap-2 mb-3">
+                      <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                        {position.vessel?.vessel_type || 'Vessel'}
+                      </Badge>
+                      <span className="text-xs text-gray-500">
+                        {new Date(position.created_at).toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric',
+                        })}
+                      </span>
+                    </div>
                   </div>
 
                   {/* Position Details */}
@@ -428,13 +410,6 @@ export default function Careers() {
                       <div className="flex items-center gap-2 text-sm">
                         <Calendar className="h-4 w-4 text-red-600 flex-shrink-0" />
                         <span className="text-gray-700">{position.contract_duration}</span>
-                      </div>
-                    )}
-
-                    {position.vessel?.vessel_name && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <Ship className="h-4 w-4 text-red-600 flex-shrink-0" />
-                        <span className="text-gray-700">{position.vessel.vessel_name}</span>
                       </div>
                     )}
                   </div>
