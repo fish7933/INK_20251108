@@ -1,620 +1,439 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Checkbox } from '@/components/ui/checkbox';
+import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Eye, Mail, Phone, Calendar, DollarSign, Building2, Loader2, Trash2, Download, CheckCircle2, XCircle, ChevronDown, ChevronRight } from 'lucide-react';
+import { Eye, FileText, Mail, Ship, Briefcase, Calendar, User, Award } from 'lucide-react';
+import { applicationsAPI, vesselsAPI, positionsAPI, type Vessel, type Position, type ApplicationWithRelations } from '@/lib/supabase';
 import { toast } from 'sonner';
-import { applicationsAPI, storageAPI } from '@/lib/supabase';
-import type { Application, AdminUser, Agency } from '../types';
 
-interface ApplicationsTabProps {
-  applications: Application[];
-  setApplications: React.Dispatch<React.SetStateAction<Application[]>>;
-  agencies: Agency[];
-  currentUser: AdminUser | null;
-}
+export default function ApplicationsTab() {
+  const [applications, setApplications] = useState<ApplicationWithRelations[]>([]);
+  const [vessels, setVessels] = useState<Vessel[]>([]);
+  const [positions, setPositions] = useState<Position[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedApplication, setSelectedApplication] = useState<ApplicationWithRelations | null>(null);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [filterVesselId, setFilterVesselId] = useState<string>('all');
+  const [filterPositionId, setFilterPositionId] = useState<string>('all');
+  const [filterStatus, setFilterStatus] = useState<string>('all');
 
-export function ApplicationsTab({ applications, setApplications, agencies, currentUser }: ApplicationsTabProps) {
-  const [selectedApplication, setSelectedApplication] = useState<Application | null>(null);
-  const [selectedApplicationIds, setSelectedApplicationIds] = useState<string[]>([]);
-  const [updating, setUpdating] = useState(false);
-  const [downloadingResume, setDownloadingResume] = useState(false);
-  const [openJobGroups, setOpenJobGroups] = useState<string[]>([]);
+  useEffect(() => {
+    loadData();
+  }, []);
 
-  const formatSalary = (value: number | null) => {
-    if (!value) return 'N/A';
-    return `$${value.toLocaleString('en-US')}`;
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const [applicationsData, vesselsData, positionsData] = await Promise.all([
+        applicationsAPI.getAll(),
+        vesselsAPI.getAll(),
+        positionsAPI.getAll(),
+      ]);
+      setApplications(applicationsData);
+      setVessels(vesselsData);
+      setPositions(positionsData);
+    } catch (error) {
+      console.error('Failed to load data:', error);
+      toast.error('Failed to load applications');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const updateApplicationStatus = async (id: string, status: Application['status']) => {
-    if (!currentUser?.permissions.applications.edit) {
-      toast.error('You do not have permission to edit applications');
-      return;
-    }
+  const handleViewDetails = (application: ApplicationWithRelations) => {
+    setSelectedApplication(application);
+    setIsDetailModalOpen(true);
+  };
 
+  const handleUpdateStatus = async (id: string, status: string) => {
     try {
-      setUpdating(true);
-      await applicationsAPI.updateStatus(id, status);
-
-      setApplications(applications.map(app =>
-        app.id === id ? { ...app, status } : app
-      ));
-
+      await applicationsAPI.update(id, { status: status as 'pending' | 'reviewing' | 'accepted' | 'rejected' });
+      toast.success('Status updated successfully');
+      loadData();
       if (selectedApplication?.id === id) {
-        setSelectedApplication({ ...selectedApplication, status });
+        setSelectedApplication({ ...selectedApplication, status: status as 'pending' | 'reviewing' | 'accepted' | 'rejected' });
       }
-
-      toast.success('Application status updated');
     } catch (error) {
-      console.error('Error updating application:', error);
-      toast.error('Failed to update application status');
-    } finally {
-      setUpdating(false);
+      console.error('Failed to update status:', error);
+      toast.error('Failed to update status');
     }
   };
 
-  const handleDeleteApplication = async (id: string) => {
-    if (!currentUser?.permissions.applications.delete) {
-      toast.error('You do not have permission to delete applications');
-      return;
-    }
-
-    if (!confirm('Are you sure you want to delete this application?')) {
-      return;
-    }
-
-    try {
-      setUpdating(true);
-      await applicationsAPI.delete(id);
-      setApplications(applications.filter(app => app.id !== id));
-
-      if (selectedApplication?.id === id) {
-        setSelectedApplication(null);
-      }
-
-      toast.success('Application deleted successfully');
-    } catch (error) {
-      console.error('Error deleting application:', error);
-      toast.error('Failed to delete application');
-    } finally {
-      setUpdating(false);
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'reviewing':
+        return 'bg-blue-100 text-blue-800';
+      case 'accepted':
+        return 'bg-green-100 text-green-800';
+      case 'rejected':
+        return 'bg-red-100 text-red-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
     }
   };
 
-  const handleDeleteSelectedApplications = async () => {
-    if (!currentUser?.permissions.applications.delete) {
-      toast.error('You do not have permission to delete applications');
-      return;
-    }
+  const filteredApplications = applications.filter((app) => {
+    if (filterVesselId !== 'all' && app.vessel_id !== filterVesselId) return false;
+    if (filterPositionId !== 'all' && app.position_id !== filterPositionId) return false;
+    if (filterStatus !== 'all' && app.status !== filterStatus) return false;
+    return true;
+  });
 
-    if (selectedApplicationIds.length === 0) {
-      toast.error('Please select applications to delete');
-      return;
-    }
+  const availablePositions = filterVesselId === 'all'
+    ? positions
+    : positions.filter((p) => p.vessel_id === filterVesselId);
 
-    if (!confirm(`Are you sure you want to delete ${selectedApplicationIds.length} application(s)?`)) {
-      return;
-    }
-
-    try {
-      setUpdating(true);
-      await applicationsAPI.deleteMultiple(selectedApplicationIds);
-      setApplications(applications.filter(app => !selectedApplicationIds.includes(app.id)));
-      setSelectedApplicationIds([]);
-      toast.success(`${selectedApplicationIds.length} application(s) deleted successfully`);
-    } catch (error) {
-      console.error('Error deleting applications:', error);
-      toast.error('Failed to delete applications');
-    } finally {
-      setUpdating(false);
-    }
-  };
-
-  const toggleApplicationSelection = (id: string) => {
-    setSelectedApplicationIds(prev =>
-      prev.includes(id) ? prev.filter(appId => appId !== id) : [...prev, id]
-    );
-  };
-
-  const toggleSelectAllApplications = (appList: Application[]) => {
-    if (selectedApplicationIds.length === appList.length) {
-      setSelectedApplicationIds([]);
-    } else {
-      setSelectedApplicationIds(appList.map(app => app.id));
-    }
-  };
-
-  const toggleJobGroup = (jobTitle: string) => {
-    setOpenJobGroups(prev =>
-      prev.includes(jobTitle) ? prev.filter(t => t !== jobTitle) : [...prev, jobTitle]
-    );
-  };
-
-  const handleDownloadResume = async (application: Application) => {
-    if (!application.resume_url || !application.resume_filename) {
-      toast.error('No resume file available');
-      return;
-    }
-
-    try {
-      setDownloadingResume(true);
-      await storageAPI.downloadResume(application.resume_url, application.resume_filename);
-      toast.success('Resume downloaded successfully');
-    } catch (error) {
-      console.error('Error downloading resume:', error);
-      toast.error('Failed to download resume');
-    } finally {
-      setDownloadingResume(false);
-    }
-  };
-
-  const getStatusBadge = (status: Application['status']) => {
-    const variants = {
-      pending: 'bg-yellow-100 text-yellow-800',
-      reviewed: 'bg-blue-100 text-blue-800',
-      shortlisted: 'bg-green-100 text-green-800',
-      rejected: 'bg-red-100 text-red-800'
-    };
-    return <Badge className={variants[status]}>{status.toUpperCase()}</Badge>;
-  };
-
-  const getEmailStatusBadge = (app: Application) => {
-    if (app.email_sent) {
-      return (
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger>
-              <Badge className="bg-green-100 text-green-800 flex items-center gap-1">
-                <CheckCircle2 className="w-3 h-3" />
-                Sent
-              </Badge>
-            </TooltipTrigger>
-            <TooltipContent>
-              <div className="text-sm">
-                <p className="font-semibold mb-1">Email sent at:</p>
-                <p>{app.email_sent_at ? new Date(app.email_sent_at).toLocaleString() : 'N/A'}</p>
-                {app.email_recipients && app.email_recipients.length > 0 && (
-                  <>
-                    <p className="font-semibold mt-2 mb-1">Recipients:</p>
-                    <ul className="list-disc list-inside">
-                      {app.email_recipients.map((email, idx) => (
-                        <li key={idx}>{email}</li>
-                      ))}
-                    </ul>
-                  </>
-                )}
-              </div>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      );
-    } else {
-      return (
-        <Badge className="bg-red-100 text-red-800 flex items-center gap-1">
-          <XCircle className="w-3 h-3" />
-          Not Sent
-        </Badge>
-      );
-    }
-  };
-
-  const renderApplicationTable = (appList: Application[]) => {
-    const allSelected = appList.length > 0 && selectedApplicationIds.length === appList.length;
-    const canDelete = currentUser?.permissions.applications.delete;
-
+  if (loading) {
     return (
-      <>
-        {appList.length > 0 && selectedApplicationIds.length > 0 && canDelete && (
-          <div className="mb-4 flex items-center gap-2">
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={handleDeleteSelectedApplications}
-              disabled={updating}
-            >
-              {updating ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                <Trash2 className="w-4 h-4 mr-2" />
-              )}
-              Delete Selected ({selectedApplicationIds.length})
-            </Button>
-          </div>
-        )}
-        {appList.length === 0 ? (
-          <p className="text-center py-8 text-gray-500">
-            No applications yet
-          </p>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                {canDelete && (
-                  <TableHead className="w-12">
-                    <Checkbox
-                      checked={allSelected}
-                      onCheckedChange={() => toggleSelectAllApplications(appList)}
-                    />
-                  </TableHead>
-                )}
-                <TableHead>Name</TableHead>
-                <TableHead>Position</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Submitted</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Email Notification</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {appList.map((app) => (
-                <TableRow key={app.id}>
-                  {canDelete && (
-                    <TableCell>
-                      <Checkbox
-                        checked={selectedApplicationIds.includes(app.id)}
-                        onCheckedChange={() => toggleApplicationSelection(app.id)}
-                      />
-                    </TableCell>
-                  )}
-                  <TableCell className="font-medium">{app.full_name}</TableCell>
-                  <TableCell>{app.job_title}</TableCell>
-                  <TableCell>{app.email}</TableCell>
-                  <TableCell>
-                    {new Date(app.submitted_date).toLocaleDateString()}
-                  </TableCell>
-                  <TableCell>{getStatusBadge(app.status)}</TableCell>
-                  <TableCell>{getEmailStatusBadge(app)}</TableCell>
-                  <TableCell>
-                    <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setSelectedApplication(app)}
-                      >
-                        <Eye className="w-4 h-4 mr-1" />
-                        View
-                      </Button>
-                      {canDelete && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleDeleteApplication(app.id)}
-                          disabled={updating}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      )}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
-      </>
-    );
-  };
-
-  const renderApplicationsByJob = () => {
-    // Group applications by job title
-    const applicationsByJob = applications.reduce((acc, app) => {
-      const jobTitle = app.job_title;
-      if (!acc[jobTitle]) {
-        acc[jobTitle] = [];
-      }
-      acc[jobTitle].push(app);
-      return acc;
-    }, {} as Record<string, Application[]>);
-
-    // Get job titles sorted by application count (descending)
-    const jobTitles = Object.keys(applicationsByJob).sort((a, b) =>
-      applicationsByJob[b].length - applicationsByJob[a].length
-    );
-
-    if (jobTitles.length === 0) {
-      return (
-        <p className="text-center py-8 text-gray-500">
-          No applications yet
-        </p>
-      );
-    }
-
-    return (
-      <div className="space-y-4">
-        {jobTitles.map((jobTitle) => {
-          const jobApps = applicationsByJob[jobTitle];
-          const isOpen = openJobGroups.includes(jobTitle);
-          const statusCounts = {
-            pending: jobApps.filter(a => a.status === 'pending').length,
-            reviewed: jobApps.filter(a => a.status === 'reviewed').length,
-            shortlisted: jobApps.filter(a => a.status === 'shortlisted').length,
-            rejected: jobApps.filter(a => a.status === 'rejected').length
-          };
-
-          return (
-            <Card key={jobTitle}>
-              <Collapsible open={isOpen} onOpenChange={() => toggleJobGroup(jobTitle)}>
-                <CollapsibleTrigger asChild>
-                  <CardHeader className="cursor-pointer hover:bg-gray-50 transition-colors">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        {isOpen ? (
-                          <ChevronDown className="w-5 h-5 text-gray-500" />
-                        ) : (
-                          <ChevronRight className="w-5 h-5 text-gray-500" />
-                        )}
-                        <div>
-                          <CardTitle className="text-lg">{jobTitle}</CardTitle>
-                          <CardDescription className="mt-1">
-                            {jobApps.length} application{jobApps.length !== 1 ? 's' : ''}
-                          </CardDescription>
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        {statusCounts.pending > 0 && (
-                          <Badge className="bg-yellow-100 text-yellow-800">
-                            Pending: {statusCounts.pending}
-                          </Badge>
-                        )}
-                        {statusCounts.reviewed > 0 && (
-                          <Badge className="bg-blue-100 text-blue-800">
-                            Reviewed: {statusCounts.reviewed}
-                          </Badge>
-                        )}
-                        {statusCounts.shortlisted > 0 && (
-                          <Badge className="bg-green-100 text-green-800">
-                            Shortlisted: {statusCounts.shortlisted}
-                          </Badge>
-                        )}
-                        {statusCounts.rejected > 0 && (
-                          <Badge className="bg-red-100 text-red-800">
-                            Rejected: {statusCounts.rejected}
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                  </CardHeader>
-                </CollapsibleTrigger>
-                <CollapsibleContent>
-                  <CardContent>
-                    {renderApplicationTable(jobApps)}
-                  </CardContent>
-                </CollapsibleContent>
-              </Collapsible>
-            </Card>
-          );
-        })}
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading applications...</p>
+        </div>
       </div>
     );
-  };
+  }
 
   return (
-    <>
-      <Tabs defaultValue="all">
-        <TabsList>
-          <TabsTrigger value="all">All Applications</TabsTrigger>
-          <TabsTrigger value="by-job">By Job Posting</TabsTrigger>
-          <TabsTrigger value="pending">Pending</TabsTrigger>
-          <TabsTrigger value="shortlisted">Shortlisted</TabsTrigger>
-        </TabsList>
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-2xl font-bold">Applications</h2>
+        <p className="text-muted-foreground">Review and manage job applications</p>
+      </div>
 
-        <TabsContent value="all">
-          <Card>
-            <CardHeader>
-              <CardTitle>All Applications</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {renderApplicationTable(applications)}
-            </CardContent>
-          </Card>
-        </TabsContent>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="space-y-2">
+          <Label>Filter by Vessel</Label>
+          <Select value={filterVesselId} onValueChange={(value) => {
+            setFilterVesselId(value);
+            setFilterPositionId('all');
+          }}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Vessels</SelectItem>
+              {vessels.map((vessel) => (
+                <SelectItem key={vessel.id} value={vessel.id}>
+                  {vessel.vessel_name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-        <TabsContent value="by-job">
-          <Card>
-            <CardHeader>
-              <CardTitle>Applications by Job Posting</CardTitle>
-              <CardDescription>
-                Click on a job posting to expand and view its applications
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {renderApplicationsByJob()}
-            </CardContent>
-          </Card>
-        </TabsContent>
+        <div className="space-y-2">
+          <Label>Filter by Position</Label>
+          <Select value={filterPositionId} onValueChange={setFilterPositionId}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Positions</SelectItem>
+              {availablePositions.map((position) => (
+                <SelectItem key={position.id} value={position.id}>
+                  {position.position_name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-        <TabsContent value="pending">
-          <Card>
-            <CardHeader>
-              <CardTitle>Pending Applications</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {renderApplicationTable(applications.filter(a => a.status === 'pending'))}
-            </CardContent>
-          </Card>
-        </TabsContent>
+        <div className="space-y-2">
+          <Label>Filter by Status</Label>
+          <Select value={filterStatus} onValueChange={setFilterStatus}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Status</SelectItem>
+              <SelectItem value="pending">Pending</SelectItem>
+              <SelectItem value="reviewing">Reviewing</SelectItem>
+              <SelectItem value="accepted">Accepted</SelectItem>
+              <SelectItem value="rejected">Rejected</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
 
-        <TabsContent value="shortlisted">
-          <Card>
-            <CardHeader>
-              <CardTitle>Shortlisted Candidates</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {renderApplicationTable(applications.filter(a => a.status === 'shortlisted'))}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+      {filteredApplications.length === 0 ? (
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <FileText className="h-16 w-16 text-muted-foreground mb-4" />
+            <h3 className="text-lg font-semibold mb-2">No applications found</h3>
+            <p className="text-muted-foreground">Applications will appear here when candidates apply</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Applicant</TableHead>
+                  <TableHead>Vessel</TableHead>
+                  <TableHead>Position</TableHead>
+                  <TableHead>Submitted</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Email Sent</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredApplications.map((application) => (
+                  <TableRow
+                    key={application.id}
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => handleViewDetails(application)}
+                  >
+                    <TableCell>
+                      <div>
+                        <div className="font-medium">{application.full_name}</div>
+                        <div className="text-sm text-muted-foreground">{application.email}</div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Ship className="h-4 w-4 text-muted-foreground" />
+                        {application.vessel?.vessel_name}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Briefcase className="h-4 w-4 text-muted-foreground" />
+                        {application.position?.position_name}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {new Date(application.submitted_date).toLocaleDateString()}
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={getStatusColor(application.status)}>
+                        {application.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {application.email_sent ? (
+                        <Badge variant="outline" className="bg-green-50 text-green-700">
+                          <Mail className="h-3 w-3 mr-1" />
+                          Sent
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="bg-gray-50 text-gray-700">
+                          Not Sent
+                        </Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleViewDetails(application);
+                        }}
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
 
-      {/* Application Detail Modal */}
-      {selectedApplication && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 overflow-y-auto">
-          <Card className="max-w-3xl w-full my-8">
-            <CardHeader>
-              <div className="flex justify-between items-start">
-                <div>
-                  <CardTitle className="text-2xl">{selectedApplication.full_name}</CardTitle>
-                  <CardDescription>{selectedApplication.job_title}</CardDescription>
-                </div>
-                <Button
-                  variant="ghost"
-                  onClick={() => setSelectedApplication(null)}
-                >
-                  ✕
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-6">
+      <Dialog open={isDetailModalOpen} onOpenChange={setIsDetailModalOpen}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Application Details</DialogTitle>
+            <DialogDescription>Review applicant information and update status</DialogDescription>
+          </DialogHeader>
+
+          {selectedApplication && (
+            <div className="space-y-6">
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-sm text-gray-500">Email</Label>
-                  <p className="flex items-center gap-2">
-                    <Mail className="w-4 h-4" />
-                    {selectedApplication.email}
-                  </p>
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
+                      <Ship className="h-4 w-4" />
+                      Vessel Information
+                    </h3>
+                    <div className="bg-muted/50 p-3 rounded-lg">
+                      <p className="font-medium">{selectedApplication.vessel?.vessel_name}</p>
+                      <p className="text-sm text-muted-foreground">{selectedApplication.vessel?.vessel_type}</p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h3 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
+                      <Briefcase className="h-4 w-4" />
+                      Position Applied
+                    </h3>
+                    <div className="bg-muted/50 p-3 rounded-lg">
+                      <p className="font-medium">{selectedApplication.position?.position_name}</p>
+                      <p className="text-sm text-muted-foreground">{selectedApplication.position?.rank}</p>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <Label className="text-sm text-gray-500">Phone</Label>
-                  <p className="flex items-center gap-2">
-                    <Phone className="w-4 h-4" />
-                    {selectedApplication.phone}
-                  </p>
-                </div>
-                <div>
-                  <Label className="text-sm text-gray-500">Date of Birth</Label>
-                  <p className="flex items-center gap-2">
-                    <Calendar className="w-4 h-4" />
-                    {selectedApplication.date_of_birth ? new Date(selectedApplication.date_of_birth).toLocaleDateString() : 'N/A'}
-                  </p>
-                </div>
-                <div>
-                  <Label className="text-sm text-gray-500">Nationality</Label>
-                  <p>{selectedApplication.nationality}</p>
-                </div>
-                <div>
-                  <Label className="text-sm text-gray-500">Experience</Label>
-                  <p>{selectedApplication.experience_years} years</p>
-                </div>
-                <div>
-                  <Label className="text-sm text-gray-500">Expected Salary</Label>
-                  <p className="flex items-center gap-2">
-                    <DollarSign className="w-4 h-4" />
-                    {formatSalary(selectedApplication.expected_salary)}
-                  </p>
-                </div>
-                <div>
-                  <Label className="text-sm text-gray-500">Agency</Label>
-                  <p className="flex items-center gap-2">
-                    <Building2 className="w-4 h-4" />
-                    {selectedApplication.agency_id ? agencies.find(a => a.id === selectedApplication.agency_id)?.name || 'N/A' : 'Direct Application'}
-                  </p>
-                </div>
-                <div>
-                  <Label className="text-sm text-gray-500">Submitted</Label>
-                  <p>{new Date(selectedApplication.submitted_date).toLocaleString()}</p>
+
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
+                      <Calendar className="h-4 w-4" />
+                      Application Status
+                    </h3>
+                    <Select
+                      value={selectedApplication.status}
+                      onValueChange={(value) => handleUpdateStatus(selectedApplication.id, value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="pending">Pending</SelectItem>
+                        <SelectItem value="reviewing">Reviewing</SelectItem>
+                        <SelectItem value="accepted">Accepted</SelectItem>
+                        <SelectItem value="rejected">Rejected</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Submitted: {new Date(selectedApplication.submitted_date).toLocaleString()}
+                    </p>
+                  </div>
+
+                  <div>
+                    <h3 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
+                      <Mail className="h-4 w-4" />
+                      Email Status
+                    </h3>
+                    <div className="bg-muted/50 p-3 rounded-lg">
+                      {selectedApplication.email_sent ? (
+                        <>
+                          <Badge variant="outline" className="bg-green-50 text-green-700 mb-2">
+                            Email Sent
+                          </Badge>
+                          {selectedApplication.email_sent_at && (
+                            <p className="text-xs text-muted-foreground">
+                              Sent at: {new Date(selectedApplication.email_sent_at).toLocaleString()}
+                            </p>
+                          )}
+                          {selectedApplication.resume_attached && (
+                            <p className="text-xs text-muted-foreground">Resume attached</p>
+                          )}
+                        </>
+                      ) : (
+                        <Badge variant="outline" className="bg-gray-50 text-gray-700">
+                          Email Not Sent
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              {selectedApplication.certificates && (
-                <div>
-                  <Label className="text-sm text-gray-500 mb-2 block">Certificates</Label>
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <p className="whitespace-pre-wrap">{selectedApplication.certificates}</p>
+              <div className="border-t pt-4">
+                <h3 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
+                  <User className="h-4 w-4" />
+                  Personal Information
+                </h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Full Name</p>
+                    <p className="font-medium">{selectedApplication.full_name}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Email</p>
+                    <p className="font-medium">{selectedApplication.email}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Phone</p>
+                    <p className="font-medium">{selectedApplication.phone}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Nationality</p>
+                    <p className="font-medium">{selectedApplication.nationality || 'Not specified'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Date of Birth</p>
+                    <p className="font-medium">
+                      {selectedApplication.date_of_birth
+                        ? new Date(selectedApplication.date_of_birth).toLocaleDateString()
+                        : 'Not specified'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Experience</p>
+                    <p className="font-medium">
+                      {selectedApplication.experience_years
+                        ? `${selectedApplication.experience_years} years`
+                        : 'Not specified'}
+                    </p>
                   </div>
                 </div>
-              )}
+              </div>
 
-              {selectedApplication.previous_vessels && (
-                <div>
-                  <Label className="text-sm text-gray-500 mb-2 block">Previous Vessels</Label>
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <p className="whitespace-pre-wrap">{selectedApplication.previous_vessels}</p>
-                  </div>
+              <div className="border-t pt-4">
+                <h3 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
+                  <Award className="h-4 w-4" />
+                  Professional Details
+                </h3>
+                <div className="space-y-3">
+                  {selectedApplication.certificates && (
+                    <div>
+                      <p className="text-sm text-muted-foreground">Certificates</p>
+                      <p className="font-medium whitespace-pre-wrap">{selectedApplication.certificates}</p>
+                    </div>
+                  )}
+                  {selectedApplication.previous_vessels && (
+                    <div>
+                      <p className="text-sm text-muted-foreground">Previous Vessels</p>
+                      <p className="font-medium whitespace-pre-wrap">{selectedApplication.previous_vessels}</p>
+                    </div>
+                  )}
+                  {selectedApplication.expected_salary && (
+                    <div>
+                      <p className="text-sm text-muted-foreground">Expected Salary</p>
+                      <p className="font-medium">
+                        ${selectedApplication.expected_salary.toLocaleString()} {selectedApplication.salary_currency}
+                      </p>
+                    </div>
+                  )}
                 </div>
-              )}
+              </div>
 
               {selectedApplication.cover_letter && (
-                <div>
-                  <Label className="text-sm text-gray-500 mb-2 block">Cover Letter</Label>
-                  <div className="bg-gray-50 p-4 rounded-lg">
+                <div className="border-t pt-4">
+                  <h3 className="text-sm font-medium text-muted-foreground mb-3">Cover Letter</h3>
+                  <div className="bg-muted/50 p-4 rounded-lg">
                     <p className="whitespace-pre-wrap">{selectedApplication.cover_letter}</p>
                   </div>
                 </div>
               )}
 
               {selectedApplication.resume_url && (
-                <div>
-                  <Label className="text-sm text-gray-500 mb-2 block">Resume</Label>
+                <div className="border-t pt-4">
+                  <h3 className="text-sm font-medium text-muted-foreground mb-3">Resume</h3>
                   <Button
                     variant="outline"
-                    onClick={() => handleDownloadResume(selectedApplication)}
-                    disabled={downloadingResume}
+                    onClick={() => window.open(selectedApplication.resume_url, '_blank')}
                   >
-                    {downloadingResume ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Downloading...
-                      </>
-                    ) : (
-                      <>
-                        <Download className="w-4 h-4 mr-2" />
-                        Download Resume
-                      </>
-                    )}
+                    <FileText className="mr-2 h-4 w-4" />
+                    View Resume ({selectedApplication.resume_filename})
                   </Button>
                 </div>
               )}
-
-              {currentUser?.permissions.applications.edit && (
-                <div>
-                  <Label className="text-sm text-gray-500 mb-2 block">Update Status</Label>
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      variant={selectedApplication.status === 'pending' ? 'default' : 'outline'}
-                      onClick={() => updateApplicationStatus(selectedApplication.id, 'pending')}
-                      disabled={updating}
-                    >
-                      Pending
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant={selectedApplication.status === 'reviewed' ? 'default' : 'outline'}
-                      onClick={() => updateApplicationStatus(selectedApplication.id, 'reviewed')}
-                      disabled={updating}
-                    >
-                      Reviewed
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant={selectedApplication.status === 'shortlisted' ? 'default' : 'outline'}
-                      onClick={() => updateApplicationStatus(selectedApplication.id, 'shortlisted')}
-                      disabled={updating}
-                    >
-                      Shortlisted
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant={selectedApplication.status === 'rejected' ? 'default' : 'outline'}
-                      onClick={() => updateApplicationStatus(selectedApplication.id, 'rejected')}
-                      disabled={updating}
-                    >
-                      Rejected
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      )}
-    </>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 }

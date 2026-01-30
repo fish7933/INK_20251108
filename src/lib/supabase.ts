@@ -5,1070 +5,414 @@ const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYm
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// Enhanced Storage utility that works in iframe context with multiple fallback strategies
-class StorageManager {
-  private useSessionStorage: boolean = false;
-  private memoryStorage: Record<string, string> = {};
-  private storageAvailable: boolean = true;
-
-  constructor() {
-    this.detectStorageAvailability();
-  }
-
-  private detectStorageAvailability(): void {
-    // Test localStorage
-    try {
-      const testKey = '_storage_test_' + Date.now();
-      localStorage.setItem(testKey, '1');
-      localStorage.removeItem(testKey);
-      this.useSessionStorage = false;
-      this.storageAvailable = true;
-      console.log('[StorageManager] localStorage available');
-      return;
-    } catch (e) {
-      console.warn('[StorageManager] localStorage not available:', e);
-    }
-
-    // Test sessionStorage
-    try {
-      const testKey = '_storage_test_' + Date.now();
-      sessionStorage.setItem(testKey, '1');
-      sessionStorage.removeItem(testKey);
-      this.useSessionStorage = true;
-      this.storageAvailable = true;
-      console.log('[StorageManager] sessionStorage available (fallback)');
-      return;
-    } catch (e) {
-      console.warn('[StorageManager] sessionStorage not available:', e);
-    }
-
-    // Use memory storage as last resort
-    this.storageAvailable = false;
-    console.warn('[StorageManager] Using memory storage (data will be lost on page reload)');
-  }
-
-  setItem(key: string, value: string): void {
-    try {
-      if (!this.storageAvailable) {
-        this.memoryStorage[key] = value;
-        console.log(`[StorageManager] Stored in memory: ${key}`);
-        return;
-      }
-
-      if (this.useSessionStorage) {
-        sessionStorage.setItem(key, value);
-        console.log(`[StorageManager] Stored in sessionStorage: ${key}`);
-      } else {
-        localStorage.setItem(key, value);
-        console.log(`[StorageManager] Stored in localStorage: ${key}`);
-      }
-    } catch (e) {
-      console.error('[StorageManager] setItem failed, using memory fallback:', e);
-      this.memoryStorage[key] = value;
-    }
-  }
-
-  getItem(key: string): string | null {
-    try {
-      if (!this.storageAvailable) {
-        const value = this.memoryStorage[key] || null;
-        console.log(`[StorageManager] Retrieved from memory: ${key} = ${value ? 'found' : 'not found'}`);
-        return value;
-      }
-
-      if (this.useSessionStorage) {
-        const value = sessionStorage.getItem(key);
-        console.log(`[StorageManager] Retrieved from sessionStorage: ${key} = ${value ? 'found' : 'not found'}`);
-        return value;
-      } else {
-        const value = localStorage.getItem(key);
-        console.log(`[StorageManager] Retrieved from localStorage: ${key} = ${value ? 'found' : 'not found'}`);
-        return value;
-      }
-    } catch (e) {
-      console.error('[StorageManager] getItem failed, checking memory fallback:', e);
-      return this.memoryStorage[key] || null;
-    }
-  }
-
-  removeItem(key: string): void {
-    try {
-      if (!this.storageAvailable) {
-        delete this.memoryStorage[key];
-        console.log(`[StorageManager] Removed from memory: ${key}`);
-        return;
-      }
-
-      if (this.useSessionStorage) {
-        sessionStorage.removeItem(key);
-        console.log(`[StorageManager] Removed from sessionStorage: ${key}`);
-      } else {
-        localStorage.removeItem(key);
-        console.log(`[StorageManager] Removed from localStorage: ${key}`);
-      }
-    } catch (e) {
-      console.error('[StorageManager] removeItem failed, removing from memory:', e);
-      delete this.memoryStorage[key];
-    }
-  }
-
-  isInIframe(): boolean {
-    try {
-      return window.self !== window.top;
-    } catch (e) {
-      return true;
-    }
-  }
-
-  getStorageType(): string {
-    if (!this.storageAvailable) return 'memory';
-    return this.useSessionStorage ? 'sessionStorage' : 'localStorage';
-  }
+// Vessel types
+export interface Vessel {
+  id: string;
+  vessel_name: string;
+  vessel_type: string;
+  tonnage?: number;
+  route?: string;
+  flag?: string;
+  built_year?: number;
+  description?: string;
+  image_url?: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
-const storage = new StorageManager();
+export interface Position {
+  id: string;
+  vessel_id: string;
+  position_name: string;
+  rank: string;
+  vacancies: number;
+  salary_min?: number;
+  salary_max?: number;
+  salary_currency: string;
+  contract_duration?: string;
+  requirements?: string;
+  responsibilities?: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
 
-// Types
 export interface Application {
   id: string;
+  vessel_id: string;
+  position_id: string;
   full_name: string;
   email: string;
   phone: string;
-  date_of_birth: string | null;
-  nationality: string | null;
-  job_title: string;
-  selected_position: string;
-  experience_years: number | null;
-  expected_salary: number | null;
-  salary_currency: string | null;
-  certificates: string | null;
-  previous_vessels: string | null;
-  cover_letter: string | null;
-  resume_url: string | null;
-  resume_filename: string | null;
-  status: 'pending' | 'reviewed' | 'shortlisted' | 'rejected';
-  submitted_date: string;
+  nationality?: string;
+  date_of_birth?: string;
+  experience_years?: number;
+  certificates?: string;
+  previous_vessels?: string;
+  expected_salary?: number;
+  salary_currency: string;
+  cover_letter?: string;
+  resume_url?: string;
+  resume_filename?: string;
+  status: 'pending' | 'reviewing' | 'accepted' | 'rejected';
   email_sent: boolean;
-  email_sent_at: string | null;
-  email_recipients: string[];
+  email_sent_at?: string;
+  email_recipients?: string[];
   resume_attached: boolean;
-  agency_id: string | null;
-}
-
-export interface JobPosting {
-  id: string;
-  title: string;
-  positions: string[];
-  vessel_type: string;
-  location: string;
-  salary_range: string;
-  requirements: string[];
-  responsibilities: string[];
-  status: 'active' | 'closed';
+  submitted_date: string;
   created_at: string;
+  updated_at: string;
 }
 
-export interface AdminUser {
-  id: string;
-  username: string;
-  password_hash?: string;
-  role: 'super_admin' | 'admin' | 'viewer';
-  is_approved: boolean;
-  permissions: {
-    applications: { view: boolean; edit: boolean; delete: boolean };
-    jobs: { view: boolean; edit: boolean; delete: boolean };
-    admins: { view: boolean; edit: boolean; delete: boolean };
-    settings: { view: boolean; edit: boolean; delete: boolean };
-  };
-  created_at: string;
+export interface ApplicationWithRelations extends Application {
+  vessel?: Vessel;
+  position?: Position;
 }
 
+export interface PositionWithVessel extends Position {
+  vessel?: Vessel;
+}
+
+// Vessels API
+export const vesselsAPI = {
+  getAll: async () => {
+    const { data, error } = await supabase
+      .from('app_7c39e793e3_vessels')
+      .select('*')
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    return data as Vessel[];
+  },
+
+  getActive: async () => {
+    const { data, error } = await supabase
+      .from('app_7c39e793e3_vessels')
+      .select('*')
+      .eq('is_active', true)
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    return data as Vessel[];
+  },
+
+  getById: async (id: string) => {
+    const { data, error } = await supabase
+      .from('app_7c39e793e3_vessels')
+      .select('*')
+      .eq('id', id)
+      .single();
+    
+    if (error) throw error;
+    return data as Vessel;
+  },
+
+  create: async (vessel: Omit<Vessel, 'id' | 'created_at' | 'updated_at'>) => {
+    const { data, error } = await supabase
+      .from('app_7c39e793e3_vessels')
+      .insert([vessel])
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data as Vessel;
+  },
+
+  update: async (id: string, updates: Partial<Vessel>) => {
+    const { data, error } = await supabase
+      .from('app_7c39e793e3_vessels')
+      .update({ ...updates, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data as Vessel;
+  },
+
+  delete: async (id: string) => {
+    const { error } = await supabase
+      .from('app_7c39e793e3_vessels')
+      .delete()
+      .eq('id', id);
+    
+    if (error) throw error;
+  },
+};
+
+// Positions API
+export const positionsAPI = {
+  getAll: async () => {
+    const { data, error } = await supabase
+      .from('app_7c39e793e3_positions')
+      .select('*, vessel:app_7c39e793e3_vessels(*)')
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    return data as PositionWithVessel[];
+  },
+
+  getByVessel: async (vesselId: string) => {
+    const { data, error } = await supabase
+      .from('app_7c39e793e3_positions')
+      .select('*')
+      .eq('vessel_id', vesselId)
+      .eq('is_active', true)
+      .order('rank', { ascending: true });
+    
+    if (error) throw error;
+    return data as Position[];
+  },
+
+  getById: async (id: string) => {
+    const { data, error } = await supabase
+      .from('app_7c39e793e3_positions')
+      .select('*, vessel:app_7c39e793e3_vessels(*)')
+      .eq('id', id)
+      .single();
+    
+    if (error) throw error;
+    return data as PositionWithVessel;
+  },
+
+  create: async (position: Omit<Position, 'id' | 'created_at' | 'updated_at'>) => {
+    const { data, error } = await supabase
+      .from('app_7c39e793e3_positions')
+      .insert([position])
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data as Position;
+  },
+
+  update: async (id: string, updates: Partial<Position>) => {
+    const { data, error } = await supabase
+      .from('app_7c39e793e3_positions')
+      .update({ ...updates, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data as Position;
+  },
+
+  delete: async (id: string) => {
+    const { error } = await supabase
+      .from('app_7c39e793e3_positions')
+      .delete()
+      .eq('id', id);
+    
+    if (error) throw error;
+  },
+};
+
+// Applications API
+export const applicationsAPI = {
+  getAll: async () => {
+    const { data, error } = await supabase
+      .from('app_7c39e793e3_applications')
+      .select('*, vessel:app_7c39e793e3_vessels(*), position:app_7c39e793e3_positions(*)')
+      .order('submitted_date', { ascending: false });
+    
+    if (error) throw error;
+    return data as ApplicationWithRelations[];
+  },
+
+  getById: async (id: string) => {
+    const { data, error } = await supabase
+      .from('app_7c39e793e3_applications')
+      .select('*, vessel:app_7c39e793e3_vessels(*), position:app_7c39e793e3_positions(*)')
+      .eq('id', id)
+      .single();
+    
+    if (error) throw error;
+    return data as ApplicationWithRelations;
+  },
+
+  create: async (application: Omit<Application, 'id' | 'created_at' | 'updated_at' | 'submitted_date' | 'email_sent' | 'email_sent_at' | 'email_recipients' | 'resume_attached' | 'status'>) => {
+    const { data, error } = await supabase
+      .from('app_7c39e793e3_applications')
+      .insert([application])
+      .select()
+      .single();
+    
+    if (error) throw error;
+
+    // Send emails (admin + applicant confirmation)
+    try {
+      await sendApplicationEmail(data.id);
+    } catch (emailError) {
+      console.error('Failed to send emails:', emailError);
+    }
+
+    return data as Application;
+  },
+
+  update: async (id: string, updates: Partial<Application>) => {
+    const { data, error } = await supabase
+      .from('app_7c39e793e3_applications')
+      .update({ ...updates, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data as Application;
+  },
+
+  delete: async (id: string) => {
+    const { error } = await supabase
+      .from('app_7c39e793e3_applications')
+      .delete()
+      .eq('id', id);
+    
+    if (error) throw error;
+  },
+};
+
+// Email Recipients API
 export interface EmailRecipient {
   id: string;
   email: string;
   name: string;
-  nationality: string | null;
+  nationality?: string;
   is_active: boolean;
   created_at: string;
 }
 
-export interface Agency {
-  id: string;
-  name: string;
-  contact_person: string | null;
-  email: string | null;
-  phone: string | null;
-  address: string | null;
-  is_active: boolean;
-  created_at: string;
-}
-
-export interface PositionOption {
-  id: string;
-  name: string;
-  created_at: string;
-}
-
-export interface VesselTypeOption {
-  id: string;
-  name: string;
-  created_at: string;
-}
-
-export interface LocationOption {
-  id: string;
-  name: string;
-  created_at: string;
-}
-
-export interface SalaryRangeOption {
-  id: string;
-  name: string;
-  created_at: string;
-}
-
-export interface NationalityOption {
-  id: string;
-  name: string;
-  created_at: string;
-}
-
-// Applications API
-export const applicationsAPI = {
-  async getAll(): Promise<Application[]> {
+export const emailRecipientsAPI = {
+  getAll: async () => {
     const { data, error } = await supabase
-      .from('app_7c39e793e3_applications')
+      .from('app_7c39e793e3_email_recipients')
       .select('*')
-      .order('submitted_date', { ascending: false });
-
+      .order('created_at', { ascending: false });
+    
     if (error) throw error;
-    return data || [];
+    return data as EmailRecipient[];
   },
 
-  async create(application: Omit<Application, 'id' | 'submitted_date' | 'status' | 'email_sent' | 'email_sent_at' | 'email_recipients' | 'resume_attached'>, resumeFile?: File): Promise<Application> {
+  create: async (recipient: Omit<EmailRecipient, 'id' | 'created_at'>) => {
     const { data, error } = await supabase
-      .from('app_7c39e793e3_applications')
-      .insert([{
-        ...application,
-        status: 'pending',
-        submitted_date: new Date().toISOString(),
-        email_sent: false,
-        email_sent_at: null,
-        email_recipients: [],
-        resume_attached: false
-      }])
+      .from('app_7c39e793e3_email_recipients')
+      .insert([recipient])
       .select()
       .single();
-
+    
     if (error) throw error;
-
-    // Upload resume if provided
-    if (resumeFile && data) {
-      try {
-        const { url } = await storageAPI.uploadResume(resumeFile, data.id);
-        
-        // Update application with resume URL
-        const { error: updateError } = await supabase
-          .from('app_7c39e793e3_applications')
-          .update({ resume_url: url })
-          .eq('id', data.id);
-
-        if (updateError) throw updateError;
-        
-        data.resume_url = url;
-      } catch (uploadError) {
-        console.error('Error uploading resume:', uploadError);
-      }
-    }
-
-    // Send emails after application is created
-    try {
-      // Send email to admins
-      await sendApplicationEmail(data.id);
-      
-      // Send confirmation email to applicant
-      await sendConfirmationEmail(data.id);
-    } catch (emailError) {
-      console.error('Error sending emails:', emailError);
-      // Don't throw error here - application was created successfully
-      // Email sending failure shouldn't prevent application submission
-    }
-
-    return data;
+    return data as EmailRecipient;
   },
 
-  async updateStatus(id: string, status: Application['status']): Promise<void> {
-    const { error } = await supabase
-      .from('app_7c39e793e3_applications')
-      .update({ status })
-      .eq('id', id);
-
-    if (error) throw error;
-  },
-
-  async delete(id: string): Promise<void> {
-    const { error } = await supabase
-      .from('app_7c39e793e3_applications')
-      .delete()
-      .eq('id', id);
-
-    if (error) throw error;
-  },
-
-  async deleteMultiple(ids: string[]): Promise<void> {
-    const { error } = await supabase
-      .from('app_7c39e793e3_applications')
-      .delete()
-      .in('id', ids);
-
-    if (error) throw error;
-  }
-};
-
-// Job Postings API
-export const jobPostingsAPI = {
-  async getAll(): Promise<JobPosting[]> {
+  update: async (id: string, updates: Partial<EmailRecipient>) => {
     const { data, error } = await supabase
-      .from('app_7c39e793e3_job_postings')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (error) throw error;
-    return data || [];
-  },
-
-  async getActive(): Promise<JobPosting[]> {
-    const { data, error } = await supabase
-      .from('app_7c39e793e3_job_postings')
-      .select('*')
-      .eq('status', 'active')
-      .order('created_at', { ascending: false });
-
-    if (error) throw error;
-    return data || [];
-  },
-
-  async getById(id: string): Promise<JobPosting | null> {
-    const { data, error } = await supabase
-      .from('app_7c39e793e3_job_postings')
-      .select('*')
+      .from('app_7c39e793e3_email_recipients')
+      .update(updates)
       .eq('id', id)
-      .single();
-
-    if (error) {
-      console.error('Error fetching job posting:', error);
-      return null;
-    }
-    return data;
-  },
-
-  async create(job: Omit<JobPosting, 'id' | 'created_at'>): Promise<JobPosting> {
-    const { data, error } = await supabase
-      .from('app_7c39e793e3_job_postings')
-      .insert([{ ...job, created_at: new Date().toISOString() }])
       .select()
       .single();
-
+    
     if (error) throw error;
-    return data;
+    return data as EmailRecipient;
   },
 
-  async update(id: string, job: Partial<Omit<JobPosting, 'id' | 'created_at'>>): Promise<void> {
+  delete: async (id: string) => {
     const { error } = await supabase
-      .from('app_7c39e793e3_job_postings')
-      .update(job)
-      .eq('id', id);
-
-    if (error) throw error;
-  },
-
-  async delete(id: string): Promise<void> {
-    const { error } = await supabase
-      .from('app_7c39e793e3_applications')
-      .delete()
-      .eq('job_title', id);
-
-    if (error) console.error('Error deleting related applications:', error);
-
-    const { error: jobError } = await supabase
-      .from('app_7c39e793e3_job_postings')
+      .from('app_7c39e793e3_email_recipients')
       .delete()
       .eq('id', id);
-
-    if (jobError) throw jobError;
-  },
-
-  async deleteMultiple(ids: string[]): Promise<void> {
-    const { error } = await supabase
-      .from('app_7c39e793e3_job_postings')
-      .delete()
-      .in('id', ids);
-
+    
     if (error) throw error;
-  }
-};
-
-// Admin Authentication
-export const adminAuth = {
-  async login(username: string, password: string): Promise<AdminUser | null> {
-    try {
-      console.log('[AdminAuth] Login attempt for username:', username);
-      console.log('[AdminAuth] Storage type:', storage.getStorageType());
-      console.log('[AdminAuth] Is in iframe:', storage.isInIframe());
-
-      const { data, error } = await supabase
-        .from('app_7c39e793e3_admin_users')
-        .select('*')
-        .eq('username', username)
-        .eq('is_approved', true)
-        .single();
-
-      if (error) {
-        console.error('[AdminAuth] Database query error:', error);
-        return null;
-      }
-
-      if (!data) {
-        console.error('[AdminAuth] User not found or not approved');
-        return null;
-      }
-
-      console.log('[AdminAuth] User found, verifying password...');
-
-      const encoder = new TextEncoder();
-      const passwordData = encoder.encode(password);
-      const hashBuffer = await crypto.subtle.digest('SHA-256', passwordData);
-      const hashArray = Array.from(new Uint8Array(hashBuffer));
-      const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-
-      if (hashHex === data.password_hash) {
-        const { password_hash, ...userWithoutPassword } = data;
-        console.log('[AdminAuth] Login successful for user:', username);
-        return userWithoutPassword;
-      }
-
-      console.error('[AdminAuth] Invalid password');
-      return null;
-    } catch (error) {
-      console.error('[AdminAuth] Login error:', error);
-      return null;
-    }
   },
-
-  isAuthenticated(): boolean {
-    const hasUser = !!storage.getItem('admin_user');
-    console.log('[AdminAuth] isAuthenticated:', hasUser);
-    return hasUser;
-  },
-
-  getCurrentUser(): AdminUser | null {
-    try {
-      const userStr = storage.getItem('admin_user');
-      if (!userStr) {
-        console.log('[AdminAuth] No user found in storage');
-        return null;
-      }
-      const user = JSON.parse(userStr);
-      console.log('[AdminAuth] Current user:', user.username);
-      return user;
-    } catch (error) {
-      console.error('[AdminAuth] Error getting current user:', error);
-      return null;
-    }
-  },
-
-  setCurrentUser(user: AdminUser): void {
-    try {
-      const userStr = JSON.stringify(user);
-      storage.setItem('admin_user', userStr);
-      console.log('[AdminAuth] User session saved:', user.username);
-    } catch (error) {
-      console.error('[AdminAuth] Error setting current user:', error);
-      throw error;
-    }
-  },
-
-  logout(): void {
-    try {
-      storage.removeItem('admin_user');
-      console.log('[AdminAuth] User logged out');
-    } catch (error) {
-      console.error('[AdminAuth] Error during logout:', error);
-    }
-  }
 };
 
 // Admin Users API
+export interface AdminUser {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+  is_active: boolean;
+  created_at: string;
+}
+
 export const adminUsersAPI = {
-  async getAll(): Promise<Omit<AdminUser, 'password_hash'>[]> {
+  getAll: async () => {
     const { data, error } = await supabase
       .from('app_7c39e793e3_admin_users')
-      .select('id, username, role, is_approved, permissions, created_at')
-      .order('created_at', { ascending: false });
-
-    if (error) throw error;
-    return data || [];
-  },
-
-  async create(username: string, password: string, role: AdminUser['role']): Promise<Omit<AdminUser, 'password_hash'>> {
-    // Prevent creating new super_admin accounts
-    if (role === 'super_admin') {
-      throw new Error('Cannot create new Super Admin accounts. Super Admin role can only be transferred to existing admin users.');
-    }
-
-    const encoder = new TextEncoder();
-    const passwordData = encoder.encode(password);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', passwordData);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    const passwordHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-
-    const defaultPermissions = {
-      applications: { view: false, edit: false, delete: false },
-      jobs: { view: false, edit: false, delete: false },
-      admins: { view: false, edit: false, delete: false },
-      settings: { view: false, edit: false, delete: false }
-    };
-
-    if (role === 'admin') {
-      defaultPermissions.applications = { view: true, edit: true, delete: true };
-      defaultPermissions.jobs = { view: true, edit: true, delete: true };
-      defaultPermissions.settings = { view: true, edit: false, delete: false };
-    } else if (role === 'viewer') {
-      defaultPermissions.applications = { view: true, edit: false, delete: false };
-      defaultPermissions.jobs = { view: true, edit: false, delete: false };
-    }
-
-    const { data, error } = await supabase
-      .from('app_7c39e793e3_admin_users')
-      .insert([{
-        username,
-        password_hash: passwordHash,
-        role,
-        is_approved: false,
-        permissions: defaultPermissions,
-        created_at: new Date().toISOString()
-      }])
-      .select('id, username, role, is_approved, permissions, created_at')
-      .single();
-
-    if (error) throw error;
-    return data;
-  },
-
-  async approve(id: string): Promise<void> {
-    const { error } = await supabase
-      .from('app_7c39e793e3_admin_users')
-      .update({ is_approved: true })
-      .eq('id', id);
-
-    if (error) throw error;
-  },
-
-  async reject(id: string): Promise<void> {
-    // Check if user is super_admin before rejecting
-    const { data: user } = await supabase
-      .from('app_7c39e793e3_admin_users')
-      .select('role')
-      .eq('id', id)
-      .single();
-
-    if (user?.role === 'super_admin') {
-      throw new Error('Cannot reject super admin accounts');
-    }
-
-    const { error } = await supabase
-      .from('app_7c39e793e3_admin_users')
-      .delete()
-      .eq('id', id);
-
-    if (error) throw error;
-  },
-
-  async delete(id: string): Promise<void> {
-    // Check if user is super_admin
-    const { data: user } = await supabase
-      .from('app_7c39e793e3_admin_users')
-      .select('role')
-      .eq('id', id)
-      .single();
-
-    if (user?.role === 'super_admin') {
-      // Count total super admins
-      const { data: superAdmins, error: countError } = await supabase
-        .from('app_7c39e793e3_admin_users')
-        .select('id')
-        .eq('role', 'super_admin');
-
-      if (countError) throw countError;
-
-      if (!superAdmins || superAdmins.length <= 1) {
-        throw new Error('Cannot delete the last super admin. At least one super admin must exist.');
-      }
-    }
-
-    const { error } = await supabase
-      .from('app_7c39e793e3_admin_users')
-      .delete()
-      .eq('id', id);
-
-    if (error) throw error;
-  },
-
-  async updatePassword(id: string, newPassword: string): Promise<void> {
-    const encoder = new TextEncoder();
-    const passwordData = encoder.encode(newPassword);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', passwordData);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    const passwordHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-
-    const { error } = await supabase
-      .from('app_7c39e793e3_admin_users')
-      .update({ password_hash: passwordHash })
-      .eq('id', id);
-
-    if (error) throw error;
-  },
-
-  async updatePermissions(id: string, permissions: AdminUser['permissions']): Promise<void> {
-    // Check if user is super_admin
-    const { data: user } = await supabase
-      .from('app_7c39e793e3_admin_users')
-      .select('role')
-      .eq('id', id)
-      .single();
-
-    if (user?.role === 'super_admin') {
-      throw new Error('Cannot modify permissions of super admin accounts');
-    }
-
-    const { error } = await supabase
-      .from('app_7c39e793e3_admin_users')
-      .update({ permissions })
-      .eq('id', id);
-
-    if (error) throw error;
-  },
-
-  async updateRole(id: string, role: AdminUser['role']): Promise<void> {
-    // Get current user data
-    const { data: user } = await supabase
-      .from('app_7c39e793e3_admin_users')
-      .select('role')
-      .eq('id', id)
-      .single();
-
-    if (!user) {
-      throw new Error('User not found');
-    }
-
-    // If promoting to super_admin, ensure there's at least one existing super_admin
-    if (role === 'super_admin') {
-      const { data: superAdmins, error: countError } = await supabase
-        .from('app_7c39e793e3_admin_users')
-        .select('id')
-        .eq('role', 'super_admin');
-
-      if (countError) throw countError;
-
-      if (!superAdmins || superAdmins.length === 0) {
-        throw new Error('Cannot transfer Super Admin role: No existing Super Admin found.');
-      }
-
-      // This is a transfer operation - the current super admin should demote themselves
-      // after promoting this user
-    }
-
-    // Prevent demoting super_admin unless transferring
-    if (user.role === 'super_admin' && role !== 'super_admin') {
-      // Count total super admins
-      const { data: superAdmins, error: countError } = await supabase
-        .from('app_7c39e793e3_admin_users')
-        .select('id')
-        .eq('role', 'super_admin');
-
-      if (countError) throw countError;
-
-      if (!superAdmins || superAdmins.length <= 1) {
-        throw new Error('Cannot demote the last super admin. Please transfer the role to another admin first.');
-      }
-    }
-
-    // Update role and set appropriate permissions
-    const updatedPermissions = {
-      applications: { view: false, edit: false, delete: false },
-      jobs: { view: false, edit: false, delete: false },
-      admins: { view: false, edit: false, delete: false },
-      settings: { view: false, edit: false, delete: false }
-    };
-
-    if (role === 'super_admin') {
-      updatedPermissions.applications = { view: true, edit: true, delete: true };
-      updatedPermissions.jobs = { view: true, edit: true, delete: true };
-      updatedPermissions.admins = { view: true, edit: true, delete: true };
-      updatedPermissions.settings = { view: true, edit: true, delete: true };
-    } else if (role === 'admin') {
-      updatedPermissions.applications = { view: true, edit: true, delete: true };
-      updatedPermissions.jobs = { view: true, edit: true, delete: true };
-      updatedPermissions.settings = { view: true, edit: false, delete: false };
-    } else if (role === 'viewer') {
-      updatedPermissions.applications = { view: true, edit: false, delete: false };
-      updatedPermissions.jobs = { view: true, edit: false, delete: false };
-    }
-
-    const { error } = await supabase
-      .from('app_7c39e793e3_admin_users')
-      .update({ role, permissions: updatedPermissions })
-      .eq('id', id);
-
-    if (error) throw error;
-  }
-};
-
-// Email Recipients API
-export const emailRecipientsAPI = {
-  async getAll(): Promise<EmailRecipient[]> {
-    const { data, error } = await supabase
-      .from('app_7c39e793e3_email_recipients')
       .select('*')
       .order('created_at', { ascending: false });
-
+    
     if (error) throw error;
-    return data || [];
+    return data as AdminUser[];
   },
 
-  async create(recipient: Omit<EmailRecipient, 'id' | 'created_at'>): Promise<EmailRecipient> {
+  create: async (user: Omit<AdminUser, 'id' | 'created_at'>) => {
     const { data, error } = await supabase
-      .from('app_7c39e793e3_email_recipients')
-      .insert([{ ...recipient, created_at: new Date().toISOString() }])
+      .from('app_7c39e793e3_admin_users')
+      .insert([user])
       .select()
       .single();
-
+    
     if (error) throw error;
-    return data;
+    return data as AdminUser;
   },
 
-  async update(id: string, recipient: Partial<Omit<EmailRecipient, 'id' | 'created_at'>>): Promise<void> {
-    const { error } = await supabase
-      .from('app_7c39e793e3_email_recipients')
-      .update(recipient)
-      .eq('id', id);
-
-    if (error) throw error;
-  },
-
-  async toggleActive(id: string, isActive: boolean): Promise<void> {
-    const { error } = await supabase
-      .from('app_7c39e793e3_email_recipients')
-      .update({ is_active: isActive })
-      .eq('id', id);
-
-    if (error) throw error;
-  },
-
-  async delete(id: string): Promise<void> {
-    const { error } = await supabase
-      .from('app_7c39e793e3_email_recipients')
-      .delete()
-      .eq('id', id);
-
-    if (error) throw error;
-  }
-};
-
-// Agencies API
-export const agenciesAPI = {
-  async getAll(): Promise<Agency[]> {
+  update: async (id: string, updates: Partial<AdminUser>) => {
     const { data, error } = await supabase
-      .from('app_7c39e793e3_agencies')
-      .select('*')
-      .order('name', { ascending: true });
-
-    if (error) throw error;
-    return data || [];
-  },
-
-  async getActive(): Promise<Agency[]> {
-    const { data, error } = await supabase
-      .from('app_7c39e793e3_agencies')
-      .select('*')
-      .eq('is_active', true)
-      .order('name', { ascending: true });
-
-    if (error) throw error;
-    return data || [];
-  },
-
-  async create(agency: Omit<Agency, 'id' | 'created_at'>): Promise<Agency> {
-    const { data, error } = await supabase
-      .from('app_7c39e793e3_agencies')
-      .insert([{ ...agency, created_at: new Date().toISOString() }])
+      .from('app_7c39e793e3_admin_users')
+      .update(updates)
+      .eq('id', id)
       .select()
       .single();
-
+    
     if (error) throw error;
-    return data;
+    return data as AdminUser;
   },
 
-  async update(id: string, agency: Partial<Omit<Agency, 'id' | 'created_at'>>): Promise<void> {
+  delete: async (id: string) => {
     const { error } = await supabase
-      .from('app_7c39e793e3_agencies')
-      .update(agency)
-      .eq('id', id);
-
-    if (error) throw error;
-  },
-
-  async toggleActive(id: string, isActive: boolean): Promise<void> {
-    const { error } = await supabase
-      .from('app_7c39e793e3_agencies')
-      .update({ is_active: isActive })
-      .eq('id', id);
-
-    if (error) throw error;
-  },
-
-  async delete(id: string): Promise<void> {
-    const { error } = await supabase
-      .from('app_7c39e793e3_agencies')
+      .from('app_7c39e793e3_admin_users')
       .delete()
       .eq('id', id);
-
+    
     if (error) throw error;
-  }
+  },
 };
 
-// Position Options API
-export const positionOptionsAPI = {
-  async getAll(): Promise<PositionOption[]> {
-    const { data, error } = await supabase
-      .from('app_7c39e793e3_position_options')
-      .select('*')
-      .order('name', { ascending: true });
-
-    if (error) throw error;
-    return data || [];
-  },
-
-  async create(name: string): Promise<PositionOption> {
-    const { data, error } = await supabase
-      .from('app_7c39e793e3_position_options')
-      .insert([{ name, created_at: new Date().toISOString() }])
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data;
-  },
-
-  async delete(id: string): Promise<void> {
-    const { error } = await supabase
-      .from('app_7c39e793e3_position_options')
-      .delete()
-      .eq('id', id);
-
-    if (error) throw error;
-  }
-};
-
-// Vessel Type Options API
-export const vesselTypeOptionsAPI = {
-  async getAll(): Promise<VesselTypeOption[]> {
-    const { data, error } = await supabase
-      .from('app_7c39e793e3_vessel_type_options')
-      .select('*')
-      .order('name', { ascending: true });
-
-    if (error) throw error;
-    return data || [];
-  },
-
-  async create(name: string): Promise<VesselTypeOption> {
-    const { data, error } = await supabase
-      .from('app_7c39e793e3_vessel_type_options')
-      .insert([{ name, created_at: new Date().toISOString() }])
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data;
-  },
-
-  async delete(id: string): Promise<void> {
-    const { error } = await supabase
-      .from('app_7c39e793e3_vessel_type_options')
-      .delete()
-      .eq('id', id);
-
-    if (error) throw error;
-  }
-};
-
-// Location Options API
-export const locationOptionsAPI = {
-  async getAll(): Promise<LocationOption[]> {
-    const { data, error } = await supabase
-      .from('app_7c39e793e3_location_options')
-      .select('*')
-      .order('name', { ascending: true });
-
-    if (error) throw error;
-    return data || [];
-  },
-
-  async create(name: string): Promise<LocationOption> {
-    const { data, error } = await supabase
-      .from('app_7c39e793e3_location_options')
-      .insert([{ name, created_at: new Date().toISOString() }])
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data;
-  },
-
-  async delete(id: string): Promise<void> {
-    const { error } = await supabase
-      .from('app_7c39e793e3_location_options')
-      .delete()
-      .eq('id', id);
-
-    if (error) throw error;
-  }
-};
-
-// Salary Range Options API
-export const salaryRangeOptionsAPI = {
-  async getAll(): Promise<SalaryRangeOption[]> {
-    const { data, error } = await supabase
-      .from('app_7c39e793e3_salary_range_options')
-      .select('*')
-      .order('name', { ascending: true });
-
-    if (error) throw error;
-    return data || [];
-  },
-
-  async create(name: string): Promise<SalaryRangeOption> {
-    const { data, error } = await supabase
-      .from('app_7c39e793e3_salary_range_options')
-      .insert([{ name, created_at: new Date().toISOString() }])
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data;
-  },
-
-  async delete(id: string): Promise<void> {
-    const { error } = await supabase
-      .from('app_7c39e793e3_salary_range_options')
-      .delete()
-      .eq('id', id);
-
-    if (error) throw error;
-  }
-};
-
-// Nationality Options API
-export const nationalityOptionsAPI = {
-  async getAll(): Promise<NationalityOption[]> {
-    const { data, error } = await supabase
-      .from('app_7c39e793e3_nationality_options')
-      .select('*')
-      .order('name', { ascending: true });
-
-    if (error) throw error;
-    return data || [];
-  },
-
-  async create(name: string): Promise<NationalityOption> {
-    const { data, error } = await supabase
-      .from('app_7c39e793e3_nationality_options')
-      .insert([{ name, created_at: new Date().toISOString() }])
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data;
-  },
-
-  async delete(id: string): Promise<void> {
-    const { error } = await supabase
-      .from('app_7c39e793e3_nationality_options')
-      .delete()
-      .eq('id', id);
-
-    if (error) throw error;
-  }
-};
-
-// Storage API
-export const storageAPI = {
-  async uploadResume(file: File, applicationId: string): Promise<{ url: string; filename: string }> {
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${applicationId}_${Date.now()}.${fileExt}`;
-    const filePath = `${fileName}`;
-
-    const { error: uploadError } = await supabase.storage
-      .from('app_7c39e793e3_resumes')
-      .upload(filePath, file);
-
-    if (uploadError) throw uploadError;
-
-    const { data } = supabase.storage
-      .from('app_7c39e793e3_resumes')
-      .getPublicUrl(filePath);
-
-    return {
-      url: data.publicUrl,
-      filename: file.name
-    };
-  },
-
-  async downloadResume(url: string, filename: string): Promise<void> {
-    const path = url.split('/').pop();
-    if (!path) throw new Error('Invalid file path');
-
-    const { data, error } = await supabase.storage
-      .from('app_7c39e793e3_resumes')
-      .download(path);
-
-    if (error) throw error;
-
-    const blob = new Blob([data]);
-    const link = document.createElement('a');
-    link.href = window.URL.createObjectURL(blob);
-    link.download = filename;
-    link.click();
-    window.URL.revokeObjectURL(link.href);
-  }
-};
-
-// Send Application Email (to admins)
-export async function sendApplicationEmail(applicationId: string): Promise<void> {
+// Email sending function
+export const sendApplicationEmail = async (applicationId: string) => {
   const { data, error } = await supabase.functions.invoke('app_7c39e793e3_send_application_email', {
-    body: { applicationId }
+    body: { applicationId },
   });
 
   if (error) throw error;
   return data;
-}
+};
 
-// Send Confirmation Email (to applicant)
-export async function sendConfirmationEmail(applicationId: string): Promise<void> {
-  try {
-    const { data, error } = await supabase.functions.invoke('app_7c39e793e3_send_confirmation_email', {
-      body: { applicationId }
+// Storage functions
+export const uploadResume = async (file: File, applicationId: string) => {
+  const fileExt = file.name.split('.').pop();
+  const fileName = `${applicationId}.${fileExt}`;
+  const filePath = `${fileName}`;
+
+  const { data, error } = await supabase.storage
+    .from('app_7c39e793e3_resumes')
+    .upload(filePath, file, {
+      cacheControl: '3600',
+      upsert: true,
     });
 
-    if (error) {
-      console.error('Error sending confirmation email:', error);
-      throw error;
-    }
-    
-    return data;
-  } catch (error) {
-    console.error('Failed to send confirmation email:', error);
-    // Don't throw - this is a non-critical feature
-  }
-}
+  if (error) throw error;
+
+  const { data: urlData } = supabase.storage
+    .from('app_7c39e793e3_resumes')
+    .getPublicUrl(filePath);
+
+  return {
+    url: filePath,
+    publicUrl: urlData.publicUrl,
+    filename: file.name,
+  };
+};

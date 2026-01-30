@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>API Test</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <h1>Testing Supabase API</h1>
+    <div id="result"></div>
+    <script>
+        const supabaseUrl = 'https://kxxdrwwqdjkynbuyzrpz.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt4eGRyd3dxZGpreW5idXl6cnB6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIyMjAwNjYsImV4cCI6MjA3Nzc5NjA2Nn0._KflDSzupmXetTBSCPgQGoC1QUOQDU2gEL_D8XlM5hA';
+        
+        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+        
+        async function testAPI() {
+            console.log('Starting API test...');
+            
+            try {
+                const { data, error } = await supabase
+                    .from('app_7c39e793e3_positions')
+                    .select('*, vessel:app_7c39e793e3_vessels(*)')
+                    .order('created_at', { ascending: false });
+                
+                if (error) {
+                    console.error('Error:', error);
+                    document.getElementById('result').innerHTML = '<pre style="color: red;">Error: ' + JSON.stringify(error, null, 2) + '</pre>';
+                } else {
+                    console.log('Success! Data:', data);
+                    document.getElementById('result').innerHTML = '<pre style="color: green;">Success! Found ' + data.length + ' positions:\n' + JSON.stringify(data, null, 2) + '</pre>';
+                }
+            } catch (err) {
+                console.error('Exception:', err);
+                document.getElementById('result').innerHTML = '<pre style="color: red;">Exception: ' + err.message + '</pre>';
+            }
+        }
+        
+        testAPI();
+    </script>
+</body>
+</html>
